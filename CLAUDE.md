@@ -15,6 +15,7 @@ Use the lightest approach that can complete the task reliably:
 - Use one worker agent at a time by default.
 - Do not create an agent team or run agents in parallel unless the task has independent parts and parallel work provides a clear benefit.
 - Do not write substantial product code in the main session. Delegate it to an appropriate worker agent.
+- Subagents do not talk to each other. So you are responcible to process all their answers, plan further actions and execute them, do not miss important info. All the reported by agents issues should be solved or discussed with the user.
 
 ## Start of every session
 
@@ -36,7 +37,7 @@ Update `doc/pm-state.md` immediately when:
 
 Make small edits and keep the file under 60 lines.
 
-Move completed historical information to `doc/pm-state-done.md`. Do not duplicate information in different files.
+Move completed historical information to the end of `doc/pm-state-done.md`. Do not duplicate information in different files.
 
 Do not wait until the end of the session. The session may end at any time.
 
@@ -53,6 +54,7 @@ Before implementation:
 5. Define clear acceptance criteria and a practical way to verify them.
 6. Keep the story small enough for a human to review the story and expected code easily.
 7. Remove the `TODO` suffix only when the story is ready for implementation.
+8. Propose to add new epics/stories if we agree to postpone some work for later.
 
 Do not invent requirements. Record unresolved questions or assumptions explicitly.
 
@@ -74,33 +76,14 @@ Every agent brief must include:
 - required build, test, or verification commands;
 - conditions under which the agent must stop and report instead of guessing.
 
-Ask the agent for a short report containing:
-
-- what changed;
-- files changed;
-- checks performed and their results;
-- how to test the result;
-- anything not completed;
-- problems, risks, or unexpected findings.
+Ask the agent for a short report (they know the format of the answers).
 
 Do not assign overlapping write scopes to multiple agents.
 
 ## Verification and completion
 
-An agent report is not sufficient evidence that a story is complete.
-
-Before marking a story as `DONE`:
-
-1. Review the actual changes.
-2. Confirm that the changes stay within the story scope.
-3. Run or independently confirm the required build and tests.
-4. Check every acceptance criterion.
-5. Check that no unexpected files were changed.
-6. Record unresolved risks or follow-up work.
-
-Use a separate reviewer agent when the change is complex, risky, security-sensitive, or difficult to verify directly.
-
-Mark the story as `DONE` only after final verification succeeds.
+Agents' reports are sufficient evidence to decide if the story is complete.
+Mark the story as `DONE` only when it is done.
 
 ## Application requirements
 
@@ -142,3 +125,5 @@ Organize user stories into epics. New stories have a `TODO` suffix until they ar
 Highlight ambiguities, missing information, missing steps, risks, and dependencies. Suggest a concrete next action.
 
 When a decision belongs to the user, ask a focused question. Otherwise, choose a sensible default, record it when important, and continue.
+
+If any agent misunderstand the task, or do not provide expected report => report this to the user to correct the agent's instructions.

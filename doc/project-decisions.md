@@ -23,6 +23,12 @@ A web application for reading a book and learning English: read a text book, lis
 | D8 | Text-audio sync | Sentence-level timestamps produced by forced alignment (spike S4.2 validates). Fallback: chapter-level audio with manual offset | Alignment quality is the biggest technical risk |
 | D9 | Pronunciation scoring | Required. Approach decided by spike S6.1 (Whisper transcript diff vs phoneme-level vs cloud). Local/offline preferred | Whisper tends to auto-correct mispronunciation, so the approach needs validation |
 | D10 | Delivery | Small stories (about 300 changed lines or fewer), each testable and bringing user value or a named technical enabler | Comfortable code review and testing |
+| D11 | Audio and book layout | One audiobook file can cover several chapters (e.g. Chapters 1-21). The book can be one big `.txt` or several files. Chapter-to-audio mapping is therefore by chapter range, not one file per chapter | Confirmed by the user (Q1). Sample: `book/1.txt` (HPMOR, starts with "Chapter 1: ...") |
+| D12 | Hardware independence | No hardware assumption. Ollama model name is a setting, not hardcoded. A small default model is suggested. AI features degrade with a clear message if no model is available. Python tools must run on CPU | User requirement (Q3). Limit: AI answer quality and speed still depend on the chosen model. Core reading and audio never depend on it |
+
+## Agent roster (PM1)
+All four agents use the mid tier (`sonnet`): code must be correct, and a cheaper tier risks rework. The PM runs one agent at a time. 
 
 ## Change log
 - 2026-10-18: Initial decisions D1-D10 approved.
+- 2026-10-21: D11, D12 and the agent roster added.

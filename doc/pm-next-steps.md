@@ -2,13 +2,12 @@
 
 Stories for the project manager (PM) role: how the project is led, staffed and steered. Separate from product stories in `stories/`.
 
-## PM1 Define the AI agent team — TODO
+## PM1 Define the AI agent team — DONE (2026-10-21)
 Create agent definitions in `.claude/agents/`, each with a narrow role and the cheapest model that fits.
 | Agent | Role | Suggested model tier |
 |---|---|---|
 | backend-dev | C# / ASP.NET Core / EF Core / SQLite stories | mid |
 | frontend-dev | Angular stories (components, services, UI) | mid |
-| python-speech-dev | Alignment and pronunciation CLI tools, spikes S4.2 and S6.1 | mid |
 | qa-reviewer | Code review and test verification against acceptance criteria. Read-only on production code, gives an independent read | mid |
 
 **Acceptance:** each agent has a written brief (scope, conventions, what it must not touch); the roster and cost rationale are recorded in `project-decisions.md`.

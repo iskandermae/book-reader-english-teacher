@@ -1,3 +1,5 @@
+book/
+
 # Angular specific
 /dist/
 /out-tsc/
