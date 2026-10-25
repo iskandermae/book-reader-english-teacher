@@ -6,7 +6,7 @@ Last updated: 2026-10-25
 Epic 0 DONE (not committed). Epic 1 in progress: S1.1 DONE, others TODO.
 
 ## Next action
-S1.3 DONE (QA approved after 1 fix round, 18 web tests pass, not committed). Groom S1.4 (reader page, backend first: chapter list and chapter text endpoints). User still needs to review and commit Epic 0 and S1.1-S1.3 (S1.3 has staged `git rm` deletions of the old home page).
+S1.4 DONE (QA approved, 45 backend tests pass, not committed). Groom S1.5 (reader page, frontend; also library titles become links to the reader). User still needs to review and commit Epic 0 and S1.1-S1.4 (S1.3 has staged `git rm` deletions of the old home page).
 
 ## Commit checklist for the user (Epic 0)
 - Commit `web/package-lock.json`.
@@ -18,14 +18,14 @@ S1.3 DONE (QA approved after 1 fix round, 18 web tests pass, not committed). Gro
 | Epic | Status |
 |---|---|
 | 0 Foundations | DONE |
-| 1 Library and Reader | S1.1-S1.3 DONE; S1.4-S1.6 (reader), S1.7 (multi-file) TODO |
+| 1 Library and Reader | S1.1-S1.4 DONE; S1.5 (reader page), S1.6 (position), S1.7 (appearance), S1.8 (multi-file) TODO |
 | 2 AI text tools | TODO |
 | 3-7 | TODO (later releases) |
 
 PM stories (`pm-next-steps.md`): PM1 DONE. PM2-PM8 TODO.
 
 ## Open decisions and questions
-- Epic 4 stories still to be checked against D11 (epic 1 done: multi-file postponed to S1.7).
+- Epic 4 stories still to be checked against D11 (epic 1 done: multi-file postponed to S1.8).
 - Decided (S1.1): one file per book, editable title defaulting to filename, duplicates allowed.
 - Need from user: one sample mp3 (will come with the relevant story).
 - Assumption: default Ollama model is chosen in Epic 2; `ollama.model` is empty until then.

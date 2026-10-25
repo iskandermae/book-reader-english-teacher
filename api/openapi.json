@@ -116,6 +116,143 @@
         }
       }
     },
+    "/api/books/{id}/chapters": {
+      "get": {
+        "tags": [
+          "Books"
+        ],
+        "summary": "Lists the chapters of a book in reading order, without paragraph text.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Book id.",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The book title and its chapters.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookChaptersResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookChaptersResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookChaptersResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No book with this id.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/books/{id}/chapters/{index}": {
+      "get": {
+        "tags": [
+          "Books"
+        ],
+        "summary": "Gets one whole chapter: its title and all paragraphs in order.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Book id.",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "index",
+            "in": "path",
+            "description": "Zero-based chapter index.",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The chapter text.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChapterResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChapterResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChapterResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No book with this id, or no chapter with this index.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/books/{id}": {
       "delete": {
         "tags": [
@@ -321,6 +458,37 @@
   },
   "components": {
     "schemas": {
+      "BookChaptersResponse": {
+        "required": [
+          "bookId",
+          "title",
+          "chapters"
+        ],
+        "type": "object",
+        "properties": {
+          "bookId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Book id.",
+            "format": "int32"
+          },
+          "title": {
+            "type": "string",
+            "description": "Book title."
+          },
+          "chapters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChapterSummaryResponse"
+            },
+            "description": "Chapters ordered by index."
+          }
+        },
+        "description": "A book's chapter list."
+      },
       "BookSummaryResponse": {
         "required": [
           "id",
@@ -368,6 +536,80 @@
           }
         },
         "description": "A book in the library list."
+      },
+      "ChapterResponse": {
+        "required": [
+          "bookId",
+          "index",
+          "title",
+          "paragraphs"
+        ],
+        "type": "object",
+        "properties": {
+          "bookId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Book id.",
+            "format": "int32"
+          },
+          "index": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Zero-based chapter index.",
+            "format": "int32"
+          },
+          "title": {
+            "type": "string",
+            "description": "Chapter title."
+          },
+          "paragraphs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Paragraph texts in reading order; the array position is the paragraph index."
+          }
+        },
+        "description": "One chapter with its text."
+      },
+      "ChapterSummaryResponse": {
+        "required": [
+          "index",
+          "title",
+          "paragraphCount"
+        ],
+        "type": "object",
+        "properties": {
+          "index": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Zero-based chapter index; use it to fetch the chapter text.",
+            "format": "int32"
+          },
+          "title": {
+            "type": "string",
+            "description": "Chapter title."
+          },
+          "paragraphCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Number of paragraphs in the chapter.",
+            "format": "int32"
+          }
+        },
+        "description": "A chapter in a book's chapter list."
       },
       "HealthResponse": {
         "required": [

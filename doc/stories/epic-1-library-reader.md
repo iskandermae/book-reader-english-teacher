@@ -4,7 +4,7 @@ Depends on: Epic 0.
 
 ## S1.1 Import a .txt book (backend) — Story — DONE
 As a reader I can import a `.txt` book through the API so it is stored for reading.
-Decisions: one file per book (multi-file is S1.7); title is a request field, the UI prefills it from the filename; importing the same book twice is allowed (no duplicate check).
+Decisions: one file per book (multi-file is S1.8); title is a request field, the UI prefills it from the filename; importing the same book twice is allowed (no duplicate check).
 **Acceptance**
 - `POST` multipart endpoint: one `.txt` file plus optional `title` (default: filename without extension). Returns book id, title, chapter count. Contract updated in `api/openapi.json`.
 - UTF-8 and UTF-8 BOM accepted; other encodings give a clear 400 error. Empty file gives a clear 400 error.
@@ -18,7 +18,7 @@ Note: sample `book/1.txt` has only Chapter 1; large-book test uses generated tex
 
 ## S1.2 Library API (backend) — Story — DONE
 As a reader I can list and delete imported books through the API.
-Decisions (defaults, change if you disagree): `Book.LastOpenedAt` is a nullable column added now, set later by S1.5 (null until then). List order: last opened first, then most recently imported. Delete is a hard delete with cascade; the confirmation dialog is UI only (S1.3).
+Decisions (defaults, change if you disagree): `Book.LastOpenedAt` is a nullable column added now, set later by S1.6 (null until then). List order: last opened first, then most recently imported. Delete is a hard delete with cascade; the confirmation dialog is UI only (S1.3).
 **Acceptance**
 - `GET /api/books` returns a list of `{id, title, chapterCount, importedAt, lastOpenedAt}` (no chapter or paragraph text), in the order above. Empty list when no books.
 - `DELETE /api/books/{id}` removes the book, its chapters and paragraphs; 204 on success, 404 for an unknown id.
@@ -29,7 +29,7 @@ Verify: dev runs tests.
 ## S1.3 Library page and upload UI (frontend) — Story — DONE
 As a reader I see my books, can import a `.txt` file, and can delete a book.
 Depends on S1.1 and S1.2 (API already done). Uses only the generated client; no backend changes.
-Decisions (defaults, change if you disagree): the library replaces the home page at `/` (the "API OK" health check goes away; a failed list load shows an error message instead). Plain Angular, no UI library. Delete confirmation is inline (Delete → "Delete? Yes / No" on the row), not a browser `confirm()`. Book titles are plain text for now; S1.4 turns them into links to the reader. After a successful upload the list refreshes and the form resets.
+Decisions (defaults, change if you disagree): the library replaces the home page at `/` (the "API OK" health check goes away; a failed list load shows an error message instead). Plain Angular, no UI library. Delete confirmation is inline (Delete → "Delete? Yes / No" on the row), not a browser `confirm()`. Book titles are plain text for now; S1.5 turns them into links to the reader. After a successful upload the list refreshes and the form resets.
 **Acceptance**
 - Route `/` shows the library: a list of books with title, chapter count, last opened (formatted date, or "never"). A link to Settings stays reachable.
 - Empty state: short text explaining how to import (choose a `.txt` file, optional title, press Import).
@@ -40,21 +40,32 @@ Decisions (defaults, change if you disagree): the library replaces the home page
 - Unit tests (Vitest via `ng test`, no network, generated client mocked): empty state, list rendering incl. "never", title prefill, import success refreshes list, import error shows detail, delete confirm/cancel/success. The old home spec and health service are removed with the page.
 Verify: dev runs `npm test -- --watch=false` and `npm run build`; QA reads the code.
 
-## S1.4 Reader page — Story — TODO
+## S1.4 Reader API (backend) — Story — DONE
+As a reader I can get a book's chapter list and one chapter's text through the API.
+Decisions (defaults, change if you disagree): chapters are addressed by their zero-based `index`. A chapter is returned whole in one response (no paging); a 100k-character chapter is about 100 KB of JSON, which is fine locally, and the UI (S1.5) is responsible for smooth rendering. Paragraphs are returned as an ordered array of strings; the array position is the paragraph index used by S1.6. These endpoints do not touch `LastOpenedAt` (S1.6 does).
+**Acceptance**
+- `GET /api/books/{id}/chapters` returns `{bookId, title, chapters:[{index, title, paragraphCount}]}` ordered by index; 404 for an unknown book.
+- `GET /api/books/{id}/chapters/{index}` returns `{bookId, index, title, paragraphs:[string]}` in paragraph order; 404 for an unknown book or chapter index. Chapter list loads without reading paragraph text.
+- `api/openapi.json` updated (regenerated, not by hand).
+- Unit tests (fast, no network): chapter list order and counts, chapter text order, unknown book (both routes), unknown chapter index, a generated 100k+ character chapter returns all paragraphs. Endpoint tests for both routes.
+Verify: dev runs tests.
+
+## S1.5 Reader page (frontend) — Story — TODO
+Depends on S1.4. Needs grooming before implementation (also: library titles become links to the reader, see S1.3).
 **Acceptance**
 - Chapter list navigation; one chapter rendered as paragraphs.
 - Next/previous chapter controls.
 - A chapter of 100k+ characters scrolls smoothly (no visible lag).
 
-## S1.5 Remember reading position — Story — TODO
+## S1.6 Remember reading position — Story — TODO
 **Acceptance**
 - Chapter and paragraph are saved while scrolling (debounced).
 - Opening the book from the library resumes at the saved position.
 
-## S1.6 Reader appearance — Story — TODO
+## S1.7 Reader appearance — Story — TODO
 **Acceptance**
 - Font size, light/dark theme, text column width.
 - Settings persist across sessions.
 
-## S1.7 Multi-file book import — Story — TODO
+## S1.8 Multi-file book import — Story — TODO
 One upload of several `.txt` files, ordered by natural filename sort, merged into one book (D11). Postponed from S1.1.

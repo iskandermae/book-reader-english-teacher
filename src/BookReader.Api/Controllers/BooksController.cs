@@ -26,6 +26,25 @@ public record ImportBookResponse(int Id, string Title, int ChapterCount);
 /// <param name="LastOpenedAt">When the book was last opened (UTC); null if never opened.</param>
 public record BookSummaryResponse(int Id, string Title, int ChapterCount, DateTime ImportedAt, DateTime? LastOpenedAt);
 
+/// <summary>A chapter in a book's chapter list.</summary>
+/// <param name="Index">Zero-based chapter index; use it to fetch the chapter text.</param>
+/// <param name="Title">Chapter title.</param>
+/// <param name="ParagraphCount">Number of paragraphs in the chapter.</param>
+public record ChapterSummaryResponse(int Index, string Title, int ParagraphCount);
+
+/// <summary>A book's chapter list.</summary>
+/// <param name="BookId">Book id.</param>
+/// <param name="Title">Book title.</param>
+/// <param name="Chapters">Chapters ordered by index.</param>
+public record BookChaptersResponse(int BookId, string Title, List<ChapterSummaryResponse> Chapters);
+
+/// <summary>One chapter with its text.</summary>
+/// <param name="BookId">Book id.</param>
+/// <param name="Index">Zero-based chapter index.</param>
+/// <param name="Title">Chapter title.</param>
+/// <param name="Paragraphs">Paragraph texts in reading order; the array position is the paragraph index.</param>
+public record ChapterResponse(int BookId, int Index, string Title, List<string> Paragraphs);
+
 [ApiController]
 [Route("api/books")]
 [ServiceFilter<BookImportExceptionFilter>]
@@ -40,6 +59,40 @@ public class BooksController(IBookImportService importService, IBookLibraryServi
         (await library.ListAsync(ct))
             .Select(b => new BookSummaryResponse(b.Id, b.Title, b.ChapterCount, b.ImportedAt, b.LastOpenedAt))
             .ToList();
+
+    /// <summary>Lists the chapters of a book in reading order, without paragraph text.</summary>
+    /// <param name="id">Book id.</param>
+    /// <param name="ct">Cancels the request.</param>
+    /// <response code="200">The book title and its chapters.</response>
+    /// <response code="404">No book with this id.</response>
+    [HttpGet("{id:int}/chapters")]
+    [ProducesResponseType<BookChaptersResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<BookChaptersResponse>> GetChapters(int id, CancellationToken ct)
+    {
+        var book = await library.GetChaptersAsync(id, ct);
+        return book is null
+            ? NotFound()
+            : new BookChaptersResponse(book.BookId, book.Title,
+                book.Chapters.Select(c => new ChapterSummaryResponse(c.Index, c.Title, c.ParagraphCount)).ToList());
+    }
+
+    /// <summary>Gets one whole chapter: its title and all paragraphs in order.</summary>
+    /// <param name="id">Book id.</param>
+    /// <param name="index">Zero-based chapter index.</param>
+    /// <param name="ct">Cancels the request.</param>
+    /// <response code="200">The chapter text.</response>
+    /// <response code="404">No book with this id, or no chapter with this index.</response>
+    [HttpGet("{id:int}/chapters/{index:int}")]
+    [ProducesResponseType<ChapterResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ChapterResponse>> GetChapter(int id, int index, CancellationToken ct)
+    {
+        var chapter = await library.GetChapterAsync(id, index, ct);
+        return chapter is null
+            ? NotFound()
+            : new ChapterResponse(chapter.BookId, chapter.Index, chapter.Title, chapter.Paragraphs);
+    }
 
     /// <summary>Deletes a book together with its chapters and paragraphs.</summary>
     /// <param name="id">Book id.</param>

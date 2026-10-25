@@ -52,6 +52,50 @@ public sealed class BooksEndpointTests : ApiTestBase
     }
 
     [Fact]
+    public async Task Chapter_list_and_chapter_text_are_returned()
+    {
+        await using var factory = NewApp();
+        using var client = factory.CreateClient();
+        var imported = await (await client.PostAsync("/api/books",
+            Form(Encoding.UTF8.GetBytes("Chapter 1: A\n\nOne\n\nTwo\n\nChapter 2: B\n\nMore"), "story.txt")))
+            .Content.ReadFromJsonAsync<ImportBookResponse>();
+
+        var list = await client.GetFromJsonAsync<BookChaptersResponse>($"/api/books/{imported!.Id}/chapters");
+        Assert.Equal((imported.Id, "story"), (list!.BookId, list.Title));
+        Assert.Equal([0, 1], list.Chapters.Select(c => c.Index));
+        Assert.Equal([2, 1], list.Chapters.Select(c => c.ParagraphCount));
+
+        var chapter = await client.GetFromJsonAsync<ChapterResponse>($"/api/books/{imported.Id}/chapters/0");
+        Assert.Equal((imported.Id, 0), (chapter!.BookId, chapter.Index));
+        Assert.Equal(["One", "Two"], chapter.Paragraphs);
+    }
+
+    [Theory]
+    [InlineData("/api/books/999/chapters")]
+    [InlineData("/api/books/999/chapters/0")]
+    public async Task Chapter_routes_give_404_for_unknown_book(string url)
+    {
+        await using var factory = NewApp();
+        using var client = factory.CreateClient();
+
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync(url)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Unknown_chapter_index_gives_404()
+    {
+        await using var factory = NewApp();
+        using var client = factory.CreateClient();
+        var imported = await (await client.PostAsync("/api/books",
+            Form(Encoding.UTF8.GetBytes("Chapter 1: A\n\nText"), "story.txt")))
+            .Content.ReadFromJsonAsync<ImportBookResponse>();
+
+        var response = await client.GetAsync($"/api/books/{imported!.Id}/chapters/7");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Delete_unknown_book_gives_404()
     {
         await using var factory = NewApp();
