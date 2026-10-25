@@ -6,7 +6,7 @@ Last updated: 2026-10-25
 Epic 0 DONE (not committed). Epic 1 in progress: S1.1 DONE, others TODO.
 
 ## Next action
-S1.2 DONE (QA approved, 37 tests pass, not committed). Groom S1.3 (library page and upload UI); use `/grill-me` if UI decisions are open. User still needs to review and commit Epic 0, S1.1 and S1.2.
+S1.3 DONE (QA approved after 1 fix round, 18 web tests pass, not committed). Groom S1.4 (reader page, backend first: chapter list and chapter text endpoints). User still needs to review and commit Epic 0 and S1.1-S1.3 (S1.3 has staged `git rm` deletions of the old home page).
 
 ## Commit checklist for the user (Epic 0)
 - Commit `web/package-lock.json`.
@@ -18,7 +18,7 @@ S1.2 DONE (QA approved, 37 tests pass, not committed). Groom S1.3 (library page 
 | Epic | Status |
 |---|---|
 | 0 Foundations | DONE |
-| 1 Library and Reader | S1.1-S1.2 DONE; S1.3 (library UI), S1.4-S1.6 (reader), S1.7 (multi-file) TODO |
+| 1 Library and Reader | S1.1-S1.3 DONE; S1.4-S1.6 (reader), S1.7 (multi-file) TODO |
 | 2 AI text tools | TODO |
 | 3-7 | TODO (later releases) |
 

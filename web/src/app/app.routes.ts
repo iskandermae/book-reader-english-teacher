@@ -1,8 +1,8 @@
 import { Routes } from '@angular/router';
-import { HomeComponent } from './home/home.component';
+import { LibraryComponent } from './library/library.component';
 import { SettingsComponent } from './settings/settings.component';
 
 export const routes: Routes = [
-  { path: '', component: HomeComponent },
+  { path: '', component: LibraryComponent },
   { path: 'settings', component: SettingsComponent },
 ];

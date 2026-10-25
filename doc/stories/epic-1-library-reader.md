@@ -26,8 +26,19 @@ Decisions (defaults, change if you disagree): `Book.LastOpenedAt` is a nullable 
 - Unit tests (fast, no network): empty list, order, chapter counts, delete cascades to chapters and paragraphs, delete unknown id gives 404. Endpoint tests for both routes.
 Verify: dev runs tests.
 
-## S1.3 Library page and upload UI (frontend) — Story — TODO
-Depends on S1.2 and S1.1. Library page lists books (title, chapter count, last opened or "never"); upload form (file picker, title field prefilled from filename, clear error messages from the API); delete with confirmation; empty state explains how to import. Needs grooming before implementation.
+## S1.3 Library page and upload UI (frontend) — Story — DONE
+As a reader I see my books, can import a `.txt` file, and can delete a book.
+Depends on S1.1 and S1.2 (API already done). Uses only the generated client; no backend changes.
+Decisions (defaults, change if you disagree): the library replaces the home page at `/` (the "API OK" health check goes away; a failed list load shows an error message instead). Plain Angular, no UI library. Delete confirmation is inline (Delete → "Delete? Yes / No" on the row), not a browser `confirm()`. Book titles are plain text for now; S1.4 turns them into links to the reader. After a successful upload the list refreshes and the form resets.
+**Acceptance**
+- Route `/` shows the library: a list of books with title, chapter count, last opened (formatted date, or "never"). A link to Settings stays reachable.
+- Empty state: short text explaining how to import (choose a `.txt` file, optional title, press Import).
+- Upload form: file picker limited to `.txt`; title field prefilled from the chosen file name without extension and editable; Import button disabled until a file is chosen and while uploading.
+- API errors from import (400 ProblemDetails) show the `detail` text next to the form. Generic message if there is no detail.
+- Delete: row action asks inline confirmation; Yes calls `DELETE`, then removes the row; No cancels. A failed delete shows an error.
+- Loading and list-load-error states are visible.
+- Unit tests (Vitest via `ng test`, no network, generated client mocked): empty state, list rendering incl. "never", title prefill, import success refreshes list, import error shows detail, delete confirm/cancel/success. The old home spec and health service are removed with the page.
+Verify: dev runs `npm test -- --watch=false` and `npm run build`; QA reads the code.
 
 ## S1.4 Reader page — Story — TODO
 **Acceptance**
