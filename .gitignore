@@ -28,3 +28,10 @@ book/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Runtime data (database, settings, generated files)
+/data/
+
+# .NET build output
+bin/
+obj/

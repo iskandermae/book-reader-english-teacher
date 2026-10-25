@@ -75,6 +75,8 @@ Every agent brief must include:
 
 Ask the agent for a short report (they know the format of the answers).
 
+Only developers run tests and builds. Never ask qa-reviewer (or anyone else) to run tests, builds, or code. QA reviews by reading only.
+
 Do not assign overlapping write scopes to multiple agents.
 
 ## Verification and completion
@@ -82,6 +84,7 @@ Do not assign overlapping write scopes to multiple agents.
 Agents' reports are sufficient evidence to decide if the story is complete.
 Story can't be finished without qa-reviewer makes its review, QA is the last step - after all story is implemented.
 Mark the story as `DONE` only when it is done.
+Resolve every QA finding before closing the story: fix it, or drop it with a short reason (not important). Do not carry "minors" or "not worth a story" items in `doc/pm-state.md`. If one is worth doing later, make it a TODO story; otherwise discard it.
 
 ## Application requirements
 
@@ -114,7 +117,7 @@ Mark the story as `DONE` only when it is done.
 - `.claude/agents/`: worker-agent definitions
 
 ## Way of working
-
+Do 1 story at a time, not epic in 1 go.
 Order: the backend part of the story comes before its frontend part.
 Use short, simple, and direct language when communicating with the user and worker agents.
 Organize user stories into epics. New stories have a `TODO` suffix until they are groomed.
