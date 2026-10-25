@@ -6,7 +6,7 @@ Last updated: 2026-10-21
 Planning. No product code yet. Worker agents are defined.
 
 ## Next action
-PM2: set engineering conventions (repo layout, naming, test commands, git workflow, review-loop limit, follow-up triage). Then groom Epic 0 (S0.1-S0.3) against D11 and D12, and add a story for the API contract setup (`api/openapi.json`, staleness test, `npm run api:generate`).
+Groom Epic 0 (S0.1-S0.3) against D11 and D12, and add a story for the API contract setup (`api/openapi.json`, staleness test, `npm run api:generate`).
 
 ## Current sprint
 None started. Sprint 1 will be Epic 0 (S0.1-S0.3).

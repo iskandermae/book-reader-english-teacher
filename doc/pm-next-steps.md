@@ -12,7 +12,7 @@ Create agent definitions in `.claude/agents/`, each with a narrow role and the c
 
 **Acceptance:** each agent has a written brief (scope, conventions, what it must not touch); the roster and cost rationale are recorded in `project-decisions.md`.
 
-## PM2 Set engineering conventions — TODO
+## PM2 Set engineering conventions — DONE (2026-10-25, draft; S0.1 confirms layout and commands)
 **Acceptance:** a short `CLAUDE.md` / `doc/conventions.md` with repo layout, naming, branching, test commands and PR size rule, so agents produce consistent code.
 
 ## PM3 Create the project strategy and backlog board — TODO
