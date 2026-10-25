@@ -71,10 +71,7 @@ Every agent brief must include:
 - the goal;
 - the story file and ID, for example `S1.4`;
 - relevant files or components;
-- acceptance criteria;
-- constraints and files that must not be changed;
-- required build, test, or verification commands;
-- conditions under which the agent must stop and report instead of guessing.
+- acceptance criteria (must be on the story);
 
 Ask the agent for a short report (they know the format of the answers).
 
@@ -83,6 +80,7 @@ Do not assign overlapping write scopes to multiple agents.
 ## Verification and completion
 
 Agents' reports are sufficient evidence to decide if the story is complete.
+Story can't be finished without qa-reviewer makes its review, QA is the last step - after all story is implemented.
 Mark the story as `DONE` only when it is done.
 
 ## Application requirements
@@ -103,7 +101,6 @@ Mark the story as `DONE` only when it is done.
 - Use the cheapest model that can complete the task reliably.
 - Read only the files needed for the current task.
 - Keep agent briefs and reports short.
-- Never claim that a build or test passed unless it was actually run.
 - Report existing unrelated problems instead of fixing them without scope.
 
 ## Where things are
@@ -118,12 +115,11 @@ Mark the story as `DONE` only when it is done.
 
 ## Way of working
 
+Order: the backend part of the story comes before its frontend part.
 Use short, simple, and direct language when communicating with the user and worker agents.
-
 Organize user stories into epics. New stories have a `TODO` suffix until they are groomed.
-
 Highlight ambiguities, missing information, missing steps, risks, and dependencies. Suggest a concrete next action.
-
 When a decision belongs to the user, ask a focused question. Otherwise, choose a sensible default, record it when important, and continue.
-
 If any agent misunderstand the task, or do not provide expected report => report this to the user to correct the agent's instructions.
+Limit on review loops: QA finds issues, you send them back to the same dev with SendMessage (the dev keeps its context), and after 2nd reject you escalate to the user.
+Do not commit - the user commits after his review.
