@@ -6,7 +6,7 @@ Last updated: 2026-10-25
 Epic 0 DONE (not committed). Epic 1 in progress: S1.1 DONE, others TODO.
 
 ## Next action
-S1.5, S1.6 (backend), S1.6b (frontend) groomed (READY). User asked: implement and commit S1.5, then S1.6+S1.6b in one go. S1.5 DONE and committed. S1.6 DONE and committed. Next: S1.6b frontend (frontend-dev). Epic 0 and S1.1-S1.4 are committed.
+S1.5, S1.6 (backend), S1.6b (frontend) groomed (READY). User asked: implement and commit S1.5, then S1.6+S1.6b in one go. S1.5 DONE and committed. S1.5, S1.6, S1.6b DONE and committed. Next: groom S1.7 (reader appearance). Manual browser check of resume on a 1000-paragraph chapter still to do by the user (possible one-paragraph drift; no flush on tab close, up to 1 s lost). Epic 0 and S1.1-S1.4 are committed.
 
 ## Commit checklist for the user (Epic 0)
 - Commit `web/package-lock.json`.
@@ -18,7 +18,7 @@ S1.5, S1.6 (backend), S1.6b (frontend) groomed (READY). User asked: implement an
 | Epic | Status |
 |---|---|
 | 0 Foundations | DONE |
-| 1 Library and Reader | S1.1-S1.6 DONE; S1.6b READY; S1.7 (appearance), S1.8 (multi-file) TODO |
+| 1 Library and Reader | S1.1-S1.6b DONE; S1.7 (appearance), S1.8 (multi-file) TODO |
 | 2 AI text tools | TODO |
 | 3-7 | TODO (later releases) |
 

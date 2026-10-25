@@ -6,14 +6,40 @@ import { Chapter, ReaderService } from './reader.service';
 
 const chapters = [0, 1, 2].map((index) => ({ index, title: `Chapter ${index}` }));
 
+/** jsdom has no IntersectionObserver; tests drive it by hand. */
+class FakeObserver {
+  static instances: FakeObserver[] = [];
+  observed: Element[] = [];
+  constructor(private readonly callback: (entries: IntersectionObserverEntry[]) => void) {
+    FakeObserver.instances.push(this);
+  }
+  observe(el: Element) {
+    this.observed.push(el);
+  }
+  disconnect() {
+    this.observed = [];
+  }
+  /** Reports the paragraph at `index` as entering (or leaving) the viewport. */
+  report(index: number, isIntersecting = true) {
+    this.callback([{ target: this.observed[index], isIntersecting } as IntersectionObserverEntry]);
+  }
+}
+
 describe('ReaderComponent', () => {
-  let api: { chapters: ReturnType<typeof vi.fn>; chapter: ReturnType<typeof vi.fn> };
+  type Mock = ReturnType<typeof vi.fn>;
+  let api: { chapters: Mock; chapter: Mock; position: Mock; savePosition: Mock };
+  const observer = () => FakeObserver.instances[FakeObserver.instances.length - 1];
 
   beforeEach(() => {
     // jsdom does not implement scrolling.
     vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
+    Element.prototype.scrollIntoView = vi.fn();
+    FakeObserver.instances = [];
+    vi.stubGlobal('IntersectionObserver', FakeObserver);
     api = {
       chapters: vi.fn().mockResolvedValue({ title: 'My Book', chapters }),
+      position: vi.fn().mockResolvedValue({ chapterIndex: 0, paragraphIndex: 0 }),
+      savePosition: vi.fn().mockResolvedValue(undefined),
       chapter: vi.fn((_id: number, index: number): Promise<Chapter> =>
         Promise.resolve({ title: `Chapter ${index}`, paragraphs: [`first ${index}`, `second ${index}`] })),
     };
@@ -25,7 +51,11 @@ describe('ReaderComponent', () => {
     });
   });
 
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
 
   async function open(url: string) {
     const harness = await RouterTestingHarness.create();
@@ -120,5 +150,105 @@ describe('ReaderComponent', () => {
     const { el } = await open('/books/99');
     expect(el.querySelector('[role=alert]')!.textContent).toContain('Could not load');
     expect(el.querySelector('a')!.getAttribute('href')).toBe('/');
+  });
+
+  describe('reading position', () => {
+    const settle = async (harness: { fixture: { whenStable(): Promise<unknown> }; detectChanges(): void }) => {
+      await harness.fixture.whenStable();
+      harness.detectChanges();
+    };
+
+    it('resumes at the saved chapter and paragraph when there is no ?chapter', async () => {
+      api.position.mockResolvedValue({ chapterIndex: 2, paragraphIndex: 1 });
+      const { el } = await open('/books/5');
+      expect(api.chapter).toHaveBeenCalledWith(5, 2);
+      expect(el.querySelector('h2')!.textContent).toBe('Chapter 2');
+      const scrolled = (Element.prototype.scrollIntoView as Mock).mock.contexts[0] as HTMLElement;
+      expect(scrolled.textContent).toBe('second 2');
+      // Resuming is not a change, so nothing is saved.
+      expect(api.savePosition).not.toHaveBeenCalled();
+    });
+
+    it('scrolls to the top when the saved paragraph is beyond the chapter end', async () => {
+      api.position.mockResolvedValue({ chapterIndex: 1, paragraphIndex: 50 });
+      await open('/books/5');
+      expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
+      expect(window.scrollTo).toHaveBeenCalledWith(0, 0);
+    });
+
+    it('lets ?chapter override the saved position and opens from the top', async () => {
+      api.position.mockResolvedValue({ chapterIndex: 2, paragraphIndex: 1 });
+      await open('/books/5?chapter=1');
+      expect(api.position).not.toHaveBeenCalled();
+      expect(api.chapter).toHaveBeenCalledWith(5, 1);
+      expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
+      expect(api.savePosition).toHaveBeenCalledWith(5, { chapterIndex: 1, paragraphIndex: 0 });
+    });
+
+    it('falls back to the top of chapter 0 without an error when the saved position is invalid', async () => {
+      api.position.mockResolvedValue({ chapterIndex: 9, paragraphIndex: 0 });
+      api.chapter.mockImplementation((_id: number, index: number) =>
+        index === 9 ? Promise.reject(new Error('404')) : Promise.resolve({ title: `Chapter ${index}`, paragraphs: ['a'] }));
+      const { el } = await open('/books/5');
+      expect(el.querySelector('[role=alert]')).toBeNull();
+      expect(el.querySelector('h2')!.textContent).toBe('Chapter 0');
+    });
+
+    it('falls back to chapter 0 when the position cannot be read', async () => {
+      api.position.mockRejectedValue(new Error('404'));
+      const { el } = await open('/books/5');
+      expect(el.querySelector('h2')!.textContent).toBe('Chapter 0');
+    });
+
+    it('saves once after a burst of scrolling (debounced)', async () => {
+      api.chapter.mockResolvedValue({ title: 'Long', paragraphs: ['a', 'b', 'c', 'd'] });
+      await open('/books/5');
+      vi.useFakeTimers();
+      observer().report(1);
+      vi.advanceTimersByTime(500);
+      observer().report(1, false);
+      observer().report(2);
+      vi.advanceTimersByTime(999);
+      expect(api.savePosition).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(1);
+      expect(api.savePosition).toHaveBeenCalledTimes(1);
+      expect(api.savePosition).toHaveBeenCalledWith(5, { chapterIndex: 0, paragraphIndex: 2 });
+    });
+
+    it('uses the first visible paragraph as the current one', async () => {
+      await open('/books/5');
+      vi.useFakeTimers();
+      observer().report(1);
+      observer().report(0);
+      vi.advanceTimersByTime(1000);
+      // Paragraph 0 is the saved default, so there is nothing new to save.
+      expect(api.savePosition).not.toHaveBeenCalled();
+    });
+
+    it('saves immediately at paragraph 0 when the chapter changes and drops the pending save', async () => {
+      const { harness, el } = await open('/books/5');
+      vi.useFakeTimers();
+      observer().report(1);
+      button(el, 'Next').click();
+      // whenStable() waits on timers, so with fake timers let the async work run by advancing the clock.
+      await vi.advanceTimersByTimeAsync(1000);
+      harness.detectChanges();
+      expect(api.savePosition).toHaveBeenCalledTimes(1);
+      expect(api.savePosition).toHaveBeenCalledWith(5, { chapterIndex: 1, paragraphIndex: 0 });
+    });
+
+    it('flushes a pending save when the reader is destroyed', async () => {
+      const { harness } = await open('/books/5');
+      vi.useFakeTimers();
+      observer().report(1);
+      harness.fixture.destroy();
+      expect(api.savePosition).toHaveBeenCalledWith(5, { chapterIndex: 0, paragraphIndex: 1 });
+    });
+
+    it('ignores a failed save', async () => {
+      api.savePosition.mockRejectedValue(new Error('offline'));
+      const { el } = await open('/books/5?chapter=1');
+      expect(el.querySelector('[role=alert]')).toBeNull();
+    });
   });
 });

@@ -50,7 +50,7 @@ Decisions (defaults, change if you disagree): chapters are addressed by their ze
 - Unit tests (fast, no network): chapter list order and counts, chapter text order, unknown book (both routes), unknown chapter index, a generated 100k+ character chapter returns all paragraphs. Endpoint tests for both routes.
 Verify: dev runs tests.
 
-## S1.5 Reader page (frontend) — Story — READY
+## S1.5 Reader page (frontend) — Story — DONE
 As a reader I can open a book from the library and read it chapter by chapter.
 Depends on S1.4 (API done). Uses only the generated client; no backend changes.
 Decisions (defaults, change if you disagree): route `/books/:id` (optional query `?chapter=N`, zero-based, default 0); library titles become links to it. Plain Angular, no UI library. A chapter is rendered whole as `<p>` elements; smoothness comes from CSS `content-visibility: auto` with `contain-intrinsic-size` on paragraphs (no virtual-scroll library). Changing chapter scrolls to the top. Chapter list is a collapsible side panel (closed by default on narrow screens). Position saving is S1.6b; appearance is S1.7.
@@ -64,7 +64,7 @@ Decisions (defaults, change if you disagree): route `/books/:id` (optional query
 - Unit tests (Vitest, generated client mocked, no network): renders paragraphs, chapter list highlight and click, next/prev incl. disabled states, `?chapter=N`, 404 error, library link.
 Verify: dev runs `npm test -- --watch=false` and `npm run build`; QA reads the code.
 
-## S1.6 Reading position API (backend) — Story — READY
+## S1.6 Reading position API (backend) — Story — DONE
 As a reader the app stores where I stopped in each book.
 Decisions (defaults, change if you disagree): position = zero-based chapter index and paragraph index (array position from S1.4). Stored as nullable columns on `Book`. A book with no saved position reads as chapter 0, paragraph 0. Saving a position also sets `LastOpenedAt` (so library order "last opened first" works). Out-of-range values give 400 (not clamped).
 **Acceptance**
@@ -74,7 +74,7 @@ Decisions (defaults, change if you disagree): position = zero-based chapter inde
 - Unit tests (fast, no network): default 0/0, save then read back, `LastOpenedAt` set and visible in the book list order, unknown book (both routes), bad chapter, bad paragraph (negative and too large). Endpoint tests for both routes.
 Verify: dev runs tests.
 
-## S1.6b Resume reading position (frontend) — Story — READY
+## S1.6b Resume reading position (frontend) — Story — DONE
 As a reader the book opens where I stopped, and my place is saved as I read.
 Depends on S1.5 and S1.6.
 Decisions (defaults, change if you disagree): current paragraph = the first paragraph whose bottom is below the top of the viewport, found with IntersectionObserver (no scroll-event math). Save is debounced (1 s) and also sent when leaving the page or changing chapter. Failed save is silent (retried on the next change). Without `?chapter=N` the reader opens at the saved position; with it, chapter N from the top.

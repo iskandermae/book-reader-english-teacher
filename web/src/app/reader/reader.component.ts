@@ -1,8 +1,10 @@
-import { Component, computed, effect, inject, signal } from '@angular/core';
+import { afterNextRender, Component, computed, DestroyRef, effect, ElementRef, inject, Injector, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
-import { BookChapters, Chapter, ReaderService } from './reader.service';
+import { BookChapters, Chapter, ReaderService, ReadingPosition } from './reader.service';
+
+const SAVE_DELAY_MS = 1000;
 
 @Component({
   selector: 'app-reader',
@@ -59,12 +61,20 @@ export class ReaderComponent {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
+  private readonly injector = inject(Injector);
+  private readonly host = inject(ElementRef<HTMLElement>);
+
   private readonly bookId = toSignal(this.route.paramMap.pipe(map((p) => Number(p.get('id')))), { requireSync: true });
-  // Zero-based; a missing or invalid query value means the first chapter.
-  protected readonly chapterIndex = toSignal(
-    this.route.queryParamMap.pipe(map((p) => Math.max(0, Math.trunc(Number(p.get('chapter'))) || 0))),
+  // Zero-based; null when the URL has no ?chapter, which means "resume where I stopped".
+  // An invalid value means the first chapter.
+  private readonly requestedChapter = toSignal(
+    this.route.queryParamMap.pipe(
+      map((p) => (p.has('chapter') ? Math.max(0, Math.trunc(Number(p.get('chapter'))) || 0) : null)),
+    ),
     { requireSync: true },
   );
+  // The chapter actually shown (differs from the URL when resuming).
+  protected readonly chapterIndex = signal(0);
 
   protected readonly book = signal<BookChapters | null>(null);
   protected readonly chapter = signal<Chapter | null>(null);
@@ -77,35 +87,136 @@ export class ReaderComponent {
   private loadToken = 0;
   private loadedBookId: number | null = null;
 
+  // Reading position tracking: paragraphs currently on screen, the pending debounced save and the last saved value.
+  private observer: IntersectionObserver | null = null;
+  private readonly visible = new Set<number>();
+  private currentParagraph = 0;
+  private pending: { bookId: number; position: ReadingPosition } | null = null;
+  private timer: ReturnType<typeof setTimeout> | undefined;
+  private lastSaved: ReadingPosition | null = null;
+
   constructor() {
-    effect(() => void this.load(this.bookId(), this.chapterIndex()));
+    effect(() => void this.load(this.bookId(), this.requestedChapter()));
+    inject(DestroyRef).onDestroy(() => {
+      // Invalidate any in-flight load so it cannot save or start observing after destroy.
+      this.loadToken++;
+      this.stopObserving();
+      this.flush();
+    });
   }
 
   protected open(index: number): void {
     void this.router.navigate([], { queryParams: { chapter: index }, queryParamsHandling: 'merge' });
   }
 
-  private async load(bookId: number, index: number): Promise<void> {
+  private async load(bookId: number, requested: number | null): Promise<void> {
     const token = ++this.loadToken;
     this.error.set('');
     this.chapter.set(null);
+    this.stopObserving();
+    // A pending save of the previous chapter is superseded by this load; another book's save must still go out.
+    if (this.pending && this.pending.bookId !== bookId) this.flush();
+    else this.cancelPending();
     try {
       // The chapter list is only fetched when the book changes, not on every chapter switch.
       if (this.loadedBookId !== bookId) {
         this.book.set(null);
+        this.lastSaved = null;
         const book = await this.api.chapters(bookId);
         if (token !== this.loadToken) return;
         this.book.set(book);
         this.loadedBookId = bookId;
       }
-      const chapter = await this.api.chapter(bookId, index);
+      // Without ?chapter, resume at the saved position; a failed or invalid one falls back to the top of chapter 0.
+      let start: ReadingPosition = { chapterIndex: requested ?? 0, paragraphIndex: 0 };
+      let resuming = false;
+      if (requested === null) {
+        start = await this.api.position(bookId).catch(() => start);
+        if (token !== this.loadToken) return;
+        resuming = true;
+      }
+      let chapter: Chapter;
+      try {
+        chapter = await this.api.chapter(bookId, start.chapterIndex);
+      } catch (e) {
+        if (!resuming || start.chapterIndex === 0) throw e;
+        start = { chapterIndex: 0, paragraphIndex: 0 };
+        chapter = await this.api.chapter(bookId, 0);
+      }
       if (token !== this.loadToken) return;
+      this.chapterIndex.set(start.chapterIndex);
       this.chapter.set(chapter);
-      window.scrollTo(0, 0);
+      // An explicit chapter change is saved at once (paragraph 0); a resume is already saved.
+      if (resuming) this.lastSaved = start;
+      else this.save(bookId, { chapterIndex: start.chapterIndex, paragraphIndex: 0 });
+      afterNextRender(
+        () => {
+          if (token === this.loadToken) this.startObserving(bookId, start);
+        },
+        { injector: this.injector },
+      );
     } catch {
       if (token !== this.loadToken) return;
       this.loadedBookId = null;
       this.error.set('Could not load this book or chapter.');
     }
+  }
+
+  /** Scrolls to the paragraph and then watches which paragraph is at the top of the viewport. */
+  private startObserving(bookId: number, start: ReadingPosition): void {
+    const paragraphs = Array.from<HTMLElement>(this.host.nativeElement.querySelectorAll('article p'));
+    this.stopObserving();
+    // A saved paragraph beyond the chapter's end (e.g. the book changed) means the top.
+    const target = start.paragraphIndex < paragraphs.length ? start.paragraphIndex : 0;
+    if (target > 0) paragraphs[target].scrollIntoView();
+    else window.scrollTo(0, 0);
+    this.currentParagraph = target;
+    this.visible.clear();
+    // The first paragraph that intersects the viewport is the first one whose bottom is below its top.
+    this.observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        const index = paragraphs.indexOf(entry.target as HTMLElement);
+        if (entry.isIntersecting) this.visible.add(index);
+        else this.visible.delete(index);
+      }
+      if (this.visible.size === 0) return;
+      const first = Math.min(...this.visible);
+      if (first === this.currentParagraph) return;
+      this.currentParagraph = first;
+      this.schedule(bookId, { chapterIndex: this.chapterIndex(), paragraphIndex: first });
+    });
+    paragraphs.forEach((p) => this.observer!.observe(p));
+  }
+
+  private stopObserving(): void {
+    this.observer?.disconnect();
+    this.observer = null;
+  }
+
+  private schedule(bookId: number, position: ReadingPosition): void {
+    this.pending = { bookId, position };
+    clearTimeout(this.timer);
+    this.timer = setTimeout(() => this.flush(), SAVE_DELAY_MS);
+  }
+
+  private cancelPending(): void {
+    clearTimeout(this.timer);
+    this.pending = null;
+  }
+
+  private flush(): void {
+    const pending = this.pending;
+    this.cancelPending();
+    if (pending) this.save(pending.bookId, pending.position);
+  }
+
+  private save(bookId: number, position: ReadingPosition): void {
+    const last = this.lastSaved;
+    if (last && last.chapterIndex === position.chapterIndex && last.paragraphIndex === position.paragraphIndex) return;
+    // A failed save is silent; the next position change tries again.
+    this.api.savePosition(bookId, position).then(
+      () => (this.lastSaved = position),
+      () => undefined,
+    );
   }
 }
