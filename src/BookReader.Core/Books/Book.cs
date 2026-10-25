@@ -6,6 +6,8 @@ public class Book
     public int Id { get; set; }
     public required string Title { get; set; }
     public DateTime ImportedAt { get; set; }
+    /// <summary>When the book was last opened in the reader; null until it is opened (set by the reading-position story).</summary>
+    public DateTime? LastOpenedAt { get; set; }
     public List<Chapter> Chapters { get; set; } = [];
 }
 

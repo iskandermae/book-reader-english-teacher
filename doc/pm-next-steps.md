@@ -18,13 +18,13 @@ Create agent definitions in `.claude/agents/`, each with a narrow role and the c
 ## PM3 Create the project strategy and backlog board — TODO
 **Acceptance:** `doc/strategy.md` with the release order, sprint/iteration cadence, a story status board (updated by the PM after each story), and review gates (qa-reviewer approves before a story is DONE).
 
-## PM4 Run Sprint 1: Epic 0 (S0.1-S0.3) — TODO
+## PM4 Run Sprint 1: Epic 0 — TODO
 **Acceptance:** each story is assigned to an agent with a brief that includes acceptance criteria; the PM verifies results (build and tests actually run) before marking DONE.
 
-## PM5 Run Sprint 2: Epic 1 (S1.1-S1.5) — TODO
+## PM5 Run Sprint 2: Epic 1 — TODO
 **Acceptance:** same gates as PM4. Includes testing against a real HPMOR text file.
 
-## PM6 Run Sprint 3: Epic 2 (S2.1-S2.7) and declare MVP — TODO
+## PM6 Run Sprint 3: Epic 2 and declare MVP — TODO
 **Acceptance:** MVP demo checklist passes with a free local Ollama model; record the model used and its measured speed.
 
 ## PM7 Early risk spikes — TODO

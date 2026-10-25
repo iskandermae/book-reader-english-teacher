@@ -26,6 +26,9 @@ namespace BookReader.Api.Migrations
                     b.Property<DateTime>("ImportedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime?>("LastOpenedAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(200)

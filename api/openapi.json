@@ -11,6 +11,43 @@
   ],
   "paths": {
     "/api/books": {
+      "get": {
+        "tags": [
+          "Books"
+        ],
+        "summary": "Lists all books, last opened first, then most recently imported. Empty list when there are none.",
+        "responses": {
+          "200": {
+            "description": "The books, without chapter or paragraph text.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BookSummaryResponse"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BookSummaryResponse"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BookSummaryResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "tags": [
           "Books"
@@ -58,6 +95,52 @@
           },
           "400": {
             "description": "The file is not .txt, is empty, is not UTF-8, or the chapter pattern setting is invalid; the detail field explains what to fix.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/books/{id}": {
+      "delete": {
+        "tags": [
+          "Books"
+        ],
+        "summary": "Deletes a book together with its chapters and paragraphs.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Book id.",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The book was deleted."
+          },
+          "404": {
+            "description": "No book with this id.",
             "content": {
               "text/plain": {
                 "schema": {
@@ -238,6 +321,54 @@
   },
   "components": {
     "schemas": {
+      "BookSummaryResponse": {
+        "required": [
+          "id",
+          "title",
+          "chapterCount",
+          "importedAt",
+          "lastOpenedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Book id.",
+            "format": "int32"
+          },
+          "title": {
+            "type": "string",
+            "description": "Book title."
+          },
+          "chapterCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Number of chapters.",
+            "format": "int32"
+          },
+          "importedAt": {
+            "type": "string",
+            "description": "When the book was imported (UTC).",
+            "format": "date-time"
+          },
+          "lastOpenedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When the book was last opened (UTC); null if never opened.",
+            "format": "date-time"
+          }
+        },
+        "description": "A book in the library list."
+      },
       "HealthResponse": {
         "required": [
           "status"
