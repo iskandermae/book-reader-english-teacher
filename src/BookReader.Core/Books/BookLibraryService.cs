@@ -15,8 +15,19 @@ public record BookChapterList(int BookId, string Title, List<ChapterSummary> Cha
 /// <summary>One chapter's text; the paragraph array position is the paragraph index.</summary>
 public record ChapterText(int BookId, int Index, string Title, List<string> Paragraphs);
 
+/// <summary>Where the reader stopped in a book (both zero-based).</summary>
+public record ReadingPosition(int ChapterIndex, int ParagraphIndex);
+
+public enum SavePositionResult { Saved, BookNotFound, ChapterNotFound, ParagraphOutOfRange }
+
 public interface IBookLibraryService
 {
+    /// <summary>Gets the saved position, or 0/0 when none is saved. Null when the book is unknown. Does not touch LastOpenedAt.</summary>
+    Task<ReadingPosition?> GetPositionAsync(int bookId, CancellationToken ct = default);
+
+    /// <summary>Validates and saves the position and sets LastOpenedAt to now. Nothing is changed unless the result is Saved.</summary>
+    Task<SavePositionResult> SavePositionAsync(int bookId, ReadingPosition position, CancellationToken ct = default);
+
     /// <summary>Lists all books: last opened first, then most recently imported.</summary>
     Task<List<BookSummary>> ListAsync(CancellationToken ct = default);
 
@@ -69,6 +80,38 @@ public class BookLibraryService(AppDbContext db) : IBookLibraryService
             })
             .FirstOrDefaultAsync(ct);
         return chapter is null ? null : new ChapterText(bookId, index, chapter.Title, chapter.Paragraphs);
+    }
+
+    public async Task<ReadingPosition?> GetPositionAsync(int bookId, CancellationToken ct = default)
+    {
+        var book = await db.Books
+            .Where(b => b.Id == bookId)
+            .Select(b => new { b.PositionChapterIndex, b.PositionParagraphIndex })
+            .FirstOrDefaultAsync(ct);
+        return book is null ? null : new ReadingPosition(book.PositionChapterIndex ?? 0, book.PositionParagraphIndex ?? 0);
+    }
+
+    public async Task<SavePositionResult> SavePositionAsync(int bookId, ReadingPosition position, CancellationToken ct = default)
+    {
+        var book = await db.Books.FirstOrDefaultAsync(b => b.Id == bookId, ct);
+        if (book is null)
+            return SavePositionResult.BookNotFound;
+
+        // Only the paragraph count is needed, never the text.
+        var paragraphCount = await db.Chapters
+            .Where(c => c.BookId == bookId && c.Index == position.ChapterIndex)
+            .Select(c => (int?)c.Paragraphs.Count)
+            .FirstOrDefaultAsync(ct);
+        if (paragraphCount is null)
+            return SavePositionResult.ChapterNotFound;
+        if (position.ParagraphIndex < 0 || position.ParagraphIndex >= paragraphCount)
+            return SavePositionResult.ParagraphOutOfRange;
+
+        book.PositionChapterIndex = position.ChapterIndex;
+        book.PositionParagraphIndex = position.ParagraphIndex;
+        book.LastOpenedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+        return SavePositionResult.Saved;
     }
 
     public async Task<bool> DeleteAsync(int id, CancellationToken ct = default)

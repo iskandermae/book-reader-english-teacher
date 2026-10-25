@@ -29,6 +29,12 @@ namespace BookReader.Api.Migrations
                     b.Property<DateTime?>("LastOpenedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("PositionChapterIndex")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("PositionParagraphIndex")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(200)

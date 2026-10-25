@@ -45,6 +45,11 @@ public record BookChaptersResponse(int BookId, string Title, List<ChapterSummary
 /// <param name="Paragraphs">Paragraph texts in reading order; the array position is the paragraph index.</param>
 public record ChapterResponse(int BookId, int Index, string Title, List<string> Paragraphs);
 
+/// <summary>Where the reader stopped in a book. Both values are zero-based.</summary>
+/// <param name="ChapterIndex">Chapter index.</param>
+/// <param name="ParagraphIndex">Paragraph index inside the chapter (array position in the chapter response).</param>
+public record ReadingPositionDto(int ChapterIndex, int ParagraphIndex);
+
 [ApiController]
 [Route("api/books")]
 [ServiceFilter<BookImportExceptionFilter>]
@@ -93,6 +98,41 @@ public class BooksController(IBookImportService importService, IBookLibraryServi
             ? NotFound()
             : new ChapterResponse(chapter.BookId, chapter.Index, chapter.Title, chapter.Paragraphs);
     }
+
+    /// <summary>Gets where the reader stopped in a book; chapter 0, paragraph 0 when nothing is saved. Does not change the last-opened time.</summary>
+    /// <param name="id">Book id.</param>
+    /// <param name="ct">Cancels the request.</param>
+    /// <response code="200">The saved position.</response>
+    /// <response code="404">No book with this id.</response>
+    [HttpGet("{id:int}/position")]
+    [ProducesResponseType<ReadingPositionDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ReadingPositionDto>> GetPosition(int id, CancellationToken ct)
+    {
+        var position = await library.GetPositionAsync(id, ct);
+        return position is null ? NotFound() : new ReadingPositionDto(position.ChapterIndex, position.ParagraphIndex);
+    }
+
+    // Keep the "position" param doc last: the OpenAPI generator uses the last param doc as the request body description.
+    /// <summary>Saves where the reader stopped and sets the book's last-opened time to now.</summary>
+    /// <param name="id">Book id.</param>
+    /// <param name="ct">Cancels the request.</param>
+    /// <param name="position">Chapter and paragraph index.</param>
+    /// <response code="204">The position was saved.</response>
+    /// <response code="400">The chapter does not exist, or the paragraph index is negative or not below the chapter's paragraph count.</response>
+    /// <response code="404">No book with this id.</response>
+    [HttpPut("{id:int}/position")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> SavePosition(int id, ReadingPositionDto position, CancellationToken ct) =>
+        await library.SavePositionAsync(id, new ReadingPosition(position.ChapterIndex, position.ParagraphIndex), ct) switch
+        {
+            SavePositionResult.Saved => NoContent(),
+            SavePositionResult.BookNotFound => NotFound(),
+            SavePositionResult.ChapterNotFound => Problem(detail: "The chapter does not exist.", statusCode: StatusCodes.Status400BadRequest),
+            _ => Problem(detail: "The paragraph index is out of range for this chapter.", statusCode: StatusCodes.Status400BadRequest),
+        };
 
     /// <summary>Deletes a book together with its chapters and paragraphs.</summary>
     /// <param name="id">Book id.</param>

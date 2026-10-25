@@ -6,8 +6,12 @@ public class Book
     public int Id { get; set; }
     public required string Title { get; set; }
     public DateTime ImportedAt { get; set; }
-    /// <summary>When the book was last opened in the reader; null until it is opened (set by the reading-position story).</summary>
+    /// <summary>When the book was last opened in the reader; null until it is opened (set when a reading position is saved).</summary>
     public DateTime? LastOpenedAt { get; set; }
+    /// <summary>Saved reading position: zero-based chapter index. Null (with the paragraph) until a position is saved.</summary>
+    public int? PositionChapterIndex { get; set; }
+    /// <summary>Saved reading position: zero-based paragraph index inside that chapter.</summary>
+    public int? PositionParagraphIndex { get; set; }
     public List<Chapter> Chapters { get; set; } = [];
 }
 

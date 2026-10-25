@@ -145,6 +145,63 @@ public sealed class BookLibraryTests : IDisposable
     }
 
     [Fact]
+    public async Task Position_defaults_to_zero_and_get_does_not_set_last_opened()
+    {
+        var book = await AddBook("b", DateTime.UtcNow);
+
+        Assert.Equal(new ReadingPosition(0, 0), await _service.GetPositionAsync(book.Id));
+        Assert.Null((await _service.ListAsync())[0].LastOpenedAt);
+    }
+
+    [Fact]
+    public async Task Saved_position_is_read_back_and_sets_last_opened_for_list_order()
+    {
+        var day = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        await AddBook("newer", day.AddDays(1));
+        var older = await AddBook("older", day, chapters: 2);
+        var before = DateTime.UtcNow;
+
+        var result = await _service.SavePositionAsync(older.Id, new ReadingPosition(1, 1));
+
+        Assert.Equal(SavePositionResult.Saved, result);
+        Assert.Equal(new ReadingPosition(1, 1), await _service.GetPositionAsync(older.Id));
+        var list = await _service.ListAsync();
+        Assert.Equal(["older", "newer"], list.Select(b => b.Title));
+        Assert.True(list[0].LastOpenedAt >= before);
+    }
+
+    [Fact]
+    public async Task Position_for_unknown_book_is_null_or_not_found()
+    {
+        Assert.Null(await _service.GetPositionAsync(999));
+        Assert.Equal(SavePositionResult.BookNotFound, await _service.SavePositionAsync(999, new ReadingPosition(0, 0)));
+    }
+
+    [Theory]
+    [InlineData(5, 0, SavePositionResult.ChapterNotFound)]
+    [InlineData(-1, 0, SavePositionResult.ChapterNotFound)]
+    [InlineData(0, -1, SavePositionResult.ParagraphOutOfRange)]
+    [InlineData(0, 2, SavePositionResult.ParagraphOutOfRange)] // the chapter has 2 paragraphs
+    public async Task Invalid_position_is_rejected_and_nothing_changes(int chapter, int paragraph, SavePositionResult expected)
+    {
+        var book = await AddBook("b", DateTime.UtcNow, chapters: 1);
+
+        Assert.Equal(expected, await _service.SavePositionAsync(book.Id, new ReadingPosition(chapter, paragraph)));
+
+        Assert.Equal(new ReadingPosition(0, 0), await _service.GetPositionAsync(book.Id));
+        Assert.Null((await _service.ListAsync())[0].LastOpenedAt);
+    }
+
+    [Fact]
+    public async Task Delete_works_for_a_book_with_a_saved_position()
+    {
+        var book = await AddBook("b", DateTime.UtcNow);
+        await _service.SavePositionAsync(book.Id, new ReadingPosition(0, 1));
+
+        Assert.True(await _service.DeleteAsync(book.Id));
+    }
+
+    [Fact]
     public async Task Chapter_over_100k_characters_returns_all_paragraphs()
     {
         var paragraphs = Enumerable.Range(0, 1000).Select(i => P(i, $"{i}: {new string('x', 100)}")).ToList();
