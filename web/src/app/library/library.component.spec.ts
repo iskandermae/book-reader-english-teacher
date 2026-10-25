@@ -53,6 +53,7 @@ describe('LibraryComponent', () => {
     expect(rows[0].textContent).toContain('2 chapters');
     expect(rows[0].textContent).toContain('never');
     expect(rows[1].textContent).not.toContain('never');
+    expect(rows[0].querySelector('a')!.getAttribute('href')).toBe('/books/1');
   });
 
   it('shows an error when the list cannot be loaded', async () => {

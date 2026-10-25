@@ -50,17 +50,41 @@ Decisions (defaults, change if you disagree): chapters are addressed by their ze
 - Unit tests (fast, no network): chapter list order and counts, chapter text order, unknown book (both routes), unknown chapter index, a generated 100k+ character chapter returns all paragraphs. Endpoint tests for both routes.
 Verify: dev runs tests.
 
-## S1.5 Reader page (frontend) — Story — TODO
-Depends on S1.4. Needs grooming before implementation (also: library titles become links to the reader, see S1.3).
+## S1.5 Reader page (frontend) — Story — READY
+As a reader I can open a book from the library and read it chapter by chapter.
+Depends on S1.4 (API done). Uses only the generated client; no backend changes.
+Decisions (defaults, change if you disagree): route `/books/:id` (optional query `?chapter=N`, zero-based, default 0); library titles become links to it. Plain Angular, no UI library. A chapter is rendered whole as `<p>` elements; smoothness comes from CSS `content-visibility: auto` with `contain-intrinsic-size` on paragraphs (no virtual-scroll library). Changing chapter scrolls to the top. Chapter list is a collapsible side panel (closed by default on narrow screens). Position saving is S1.6b; appearance is S1.7.
 **Acceptance**
-- Chapter list navigation; one chapter rendered as paragraphs.
-- Next/previous chapter controls.
-- A chapter of 100k+ characters scrolls smoothly (no visible lag).
+- Library book titles link to `/books/:id`. Reader has a "Back to library" link.
+- Reader loads the chapter list and chapter 0 (or `?chapter=N`); shows book title, chapter title, paragraphs in order.
+- Chapter list panel: all chapters by title, current one highlighted, click opens it and updates the URL query.
+- Previous / Next buttons; Previous disabled on first chapter, Next disabled on last. Single-chapter book works.
+- Unknown book or chapter (404) and other load failures show an error message with a link back to the library; loading state visible.
+- A 100k+ character chapter (about 1000 paragraphs) uses the paragraph CSS above so it scrolls without lag.
+- Unit tests (Vitest, generated client mocked, no network): renders paragraphs, chapter list highlight and click, next/prev incl. disabled states, `?chapter=N`, 404 error, library link.
+Verify: dev runs `npm test -- --watch=false` and `npm run build`; QA reads the code.
 
-## S1.6 Remember reading position — Story — TODO
+## S1.6 Reading position API (backend) — Story — READY
+As a reader the app stores where I stopped in each book.
+Decisions (defaults, change if you disagree): position = zero-based chapter index and paragraph index (array position from S1.4). Stored as nullable columns on `Book`. A book with no saved position reads as chapter 0, paragraph 0. Saving a position also sets `LastOpenedAt` (so library order "last opened first" works). Out-of-range values give 400 (not clamped).
 **Acceptance**
-- Chapter and paragraph are saved while scrolling (debounced).
-- Opening the book from the library resumes at the saved position.
+- `PUT /api/books/{id}/position` body `{chapterIndex, paragraphIndex}`: saves it and sets `LastOpenedAt` to now; 204. 404 unknown book; 400 if the chapter does not exist, or paragraph index is negative or >= that chapter's paragraph count.
+- `GET /api/books/{id}/position` returns `{chapterIndex, paragraphIndex}`; `{0,0}` when nothing saved; 404 unknown book. It does not change `LastOpenedAt`.
+- Deleting a book (S1.2) still works. EF migration adds the columns. `api/openapi.json` regenerated, not by hand.
+- Unit tests (fast, no network): default 0/0, save then read back, `LastOpenedAt` set and visible in the book list order, unknown book (both routes), bad chapter, bad paragraph (negative and too large). Endpoint tests for both routes.
+Verify: dev runs tests.
+
+## S1.6b Resume reading position (frontend) — Story — READY
+As a reader the book opens where I stopped, and my place is saved as I read.
+Depends on S1.5 and S1.6.
+Decisions (defaults, change if you disagree): current paragraph = the first paragraph whose bottom is below the top of the viewport, found with IntersectionObserver (no scroll-event math). Save is debounced (1 s) and also sent when leaving the page or changing chapter. Failed save is silent (retried on the next change). Without `?chapter=N` the reader opens at the saved position; with it, chapter N from the top.
+**Acceptance**
+- On open (no `?chapter`) the reader calls `GET position`, loads that chapter and scrolls to that paragraph.
+- Scrolling saves `{chapterIndex, paragraphIndex}` via `PUT` after 1 s of no change (debounced); a burst of scrolling gives one call.
+- Changing chapter saves immediately (paragraph 0). Leaving the page flushes a pending save.
+- If the saved position is no longer valid (400/404 on load) the reader falls back to chapter 0 top without an error.
+- Unit tests (Vitest, client mocked, fake timers): resume at saved paragraph, debounce gives one call, chapter change saves, flush on destroy, `?chapter` overrides saved position.
+Verify: dev runs `npm test -- --watch=false` and `npm run build`; QA reads the code.
 
 ## S1.7 Reader appearance — Story — TODO
 **Acceptance**

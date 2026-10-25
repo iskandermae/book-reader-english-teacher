@@ -30,7 +30,7 @@ import { BookSummary, BooksService } from './books.service';
       <ul>
         @for (book of books(); track book.id) {
           <li>
-            {{ book.title }} - {{ book.chapterCount }} chapters - last opened:
+            <a [routerLink]="['/books', book.id]">{{ book.title }}</a>{{ ' - ' }}{{ book.chapterCount }} chapters - last opened:
             {{ book.lastOpenedAt ? (book.lastOpenedAt | date: 'medium') : 'never' }}
             @if (confirmingId() === book.id) {
               Delete?
