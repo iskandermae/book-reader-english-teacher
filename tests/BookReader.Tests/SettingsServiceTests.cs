@@ -26,7 +26,7 @@ public sealed class SettingsServiceTests : IDisposable
     {
         var all = await _service.GetAllAsync();
 
-        Assert.Equal(2, all.Count);
+        Assert.Equal(3, all.Count);
         Assert.Equal("", all[SettingsService.OllamaModel]); // never hardcoded (D12)
         Assert.Equal("", all[SettingsService.UiSample]);
     }

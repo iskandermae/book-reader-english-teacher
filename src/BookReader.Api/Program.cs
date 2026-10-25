@@ -1,4 +1,5 @@
 using BookReader.Api.Filters;
+using BookReader.Core.Books;
 using BookReader.Core.Data;
 using BookReader.Core.Settings;
 using Microsoft.EntityFrameworkCore;
@@ -12,7 +13,9 @@ Directory.CreateDirectory(dataFolder);
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.Services.AddScoped<SettingsValidationExceptionFilter>();
+builder.Services.AddScoped<BookImportExceptionFilter>();
 builder.Services.AddScoped<ISettingsService, SettingsService>();
+builder.Services.AddScoped<IBookImportService, BookImportService>();
 builder.Services.AddDbContext<AppDbContext>(options =>
     // Migrations live in the Api assembly because it is the startup project for `dotnet ef`.
     options.UseSqlite($"Data Source={DataFolder.DatabasePath(dataFolder)}",

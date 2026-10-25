@@ -1,3 +1,4 @@
+using BookReader.Core.Books;
 using BookReader.Core.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -17,6 +18,7 @@ public class SettingsService(AppDbContext db) : ISettingsService
 {
     public const string OllamaModel = "ollama.model";
     public const string UiSample = "ui.sample";
+    public const string ChapterRegex = "import.chapterRegex";
     public const int MaxValueLength = 1000;
 
     // Known keys with their defaults. Adding a setting = adding a line here (no migration needed).
@@ -25,6 +27,7 @@ public class SettingsService(AppDbContext db) : ISettingsService
     {
         [OllamaModel] = "",
         [UiSample] = "",
+        [ChapterRegex] = BookParser.DefaultChapterRegex,
     };
 
     public async Task<IReadOnlyDictionary<string, string>> GetAllAsync(CancellationToken ct = default)
@@ -80,8 +83,23 @@ public class SettingsService(AppDbContext db) : ISettingsService
                 errors.Add($"Setting '{key}' must not be null.");
             else if (value.Length > MaxValueLength)
                 errors.Add($"Setting '{key}' is too long ({value.Length} characters, maximum is {MaxValueLength}).");
+            else if (key == ChapterRegex)
+                ValidateChapterRegex(value, errors);
         }
         if (errors.Count > 0)
             throw new SettingsValidationException(string.Join(" ", errors));
+    }
+
+    // Reject a broken pattern when it is saved, so the user sees the problem in settings and not only at the next import.
+    private static void ValidateChapterRegex(string pattern, List<string> errors)
+    {
+        try
+        {
+            BookParser.CreateChapterRegex(pattern);
+        }
+        catch (BookImportException ex)
+        {
+            errors.Add($"Setting '{ChapterRegex}': {ex.Message}");
+        }
     }
 }
