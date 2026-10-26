@@ -12,7 +12,7 @@ Decisions: one file per book (multi-file is S1.8); title is a request field, the
 - Text before the first heading goes to the first chapter; a file with no matching headings becomes a single chapter.
 - Text is split into paragraphs (blank-line separated, whitespace trimmed, empty ones dropped) and stored in book, chapter, paragraph tables (EF migration).
 - An invalid regex setting gives a clear error, not a crash.
-- Unit tests (fast, no network): HPMOR-style headings, no headings, empty file, BOM, non-UTF-8, text before first heading, ~5 MB generated file imports within a few seconds.
+- Unit tests (fast, no network): HPMOR-style headings, no headings, empty file, BOM, non-UTF-8, text before first heading.
 Verify: dev runs tests; `book/1.txt` imports as 1 chapter.
 Note: sample `book/1.txt` has only Chapter 1; large-book test uses generated text.
 
@@ -109,5 +109,22 @@ Decisions (defaults, change if you disagree): controls live in a small "Appearan
 - Unit tests (Vitest, generated client mocked): defaults applied, load applies saved values, each control sends the right PUT, failed save message, theme class on root.
 Verify: dev runs `npm test -- --watch=false` and `npm run build`; QA reads the code.
 
-## S1.8 Multi-file book import — Story — TODO
-One upload of several `.txt` files, ordered by natural filename sort, merged into one book (D11). Postponed from S1.1.
+## S1.8 Multi-file book import (backend) — Story — DONE
+As a reader I can import a book split into several `.txt` files as one book (D11). Postponed from S1.1.
+Decisions: the existing import endpoint takes 1..N files (one file behaves as today). Files are sorted by natural filename order (`ch2` before `ch10`, case-insensitive) and concatenated with a blank line between them; the existing chapter regex then runs on the merged text, so a file without a heading continues the previous chapter. Title defaults to the first file's name without extension.
+**Acceptance**
+- `POST` multipart accepts one or more `.txt` files plus optional `title`. Response unchanged (book id, title, chapter count). `api/openapi.json` regenerated.
+- Natural sort order, independent of upload order.
+- Each file is checked separately: a bad encoding or an empty file gives a 400 that names the file. Nothing is saved when any file fails.
+- Zero files gives a clear 400.
+- Unit tests (fast, no network): natural sort (`2` < `10`), upload order ignored, two files with headings, a file without a heading continues the previous chapter, one bad file rejects all and names it, zero files, single file unchanged.
+Verify: dev runs tests.
+
+## S1.8b Multi-file import UI (frontend) — Story — DONE
+Depends on S1.8. Uses only the regenerated client.
+Decisions: the file input in the library form accepts several files; no manual reordering. Selected names are listed in natural sort order (same rule as the backend); the title prefills from the first file in that order, still editable.
+**Acceptance**
+- Selecting several files lists them in sorted order; selecting one looks and works as today.
+- Upload sends all files; success refreshes the list and resets the form. A 400 shows the server message (with the file name).
+- Unit tests (Vitest, client mocked): several files listed in order, title prefill from the first, upload sends all files, error message shown.
+Verify: dev runs `npm test -- --watch=false` and `npm run build`; QA reads the code.

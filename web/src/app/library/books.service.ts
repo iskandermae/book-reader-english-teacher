@@ -18,9 +18,9 @@ export class BooksService {
     return data.map((b) => ({ ...b, id: Number(b.id), chapterCount: Number(b.chapterCount) }));
   }
 
-  /** Rejects with an Error whose message is the API's readable `detail`. */
-  async import(file: File, title: string): Promise<void> {
-    const { error, response } = await postApiBooks({ body: { File: file, Title: title } });
+  /** Rejects with an Error whose message is the API's readable `detail`. The server merges the files in natural name order. */
+  async import(files: File[], title: string): Promise<void> {
+    const { error, response } = await postApiBooks({ body: { file: files, Title: title } });
     // Check the HTTP status, not just `error`: a failure with an empty body leaves `error` falsy.
     if (!response?.ok) {
       throw new Error(error?.detail ?? 'Could not import the book.');

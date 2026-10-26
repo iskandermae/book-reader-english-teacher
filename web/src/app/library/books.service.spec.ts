@@ -29,21 +29,21 @@ describe('BooksService', () => {
 
   it('resolves import and delete on success', async () => {
     respond(200, { id: 1, title: 'T', chapterCount: 1 });
-    await expect(service().import(file, 't')).resolves.toBeUndefined();
+    await expect(service().import([file], 't')).resolves.toBeUndefined();
     respond(204);
     await expect(service().delete(1)).resolves.toBeUndefined();
   });
 
   it('rejects with the API detail', async () => {
     respond(400, { detail: 'The file is empty.' });
-    await expect(service().import(file, 't')).rejects.toThrow('The file is empty.');
+    await expect(service().import([file], 't')).rejects.toThrow('The file is empty.');
     respond(404, { detail: 'No such book.' });
     await expect(service().delete(1)).rejects.toThrow('No such book.');
   });
 
   it('rejects with a generic message when the failure has an empty body', async () => {
     respond(500);
-    await expect(service().import(file, 't')).rejects.toThrow('Could not import the book.');
+    await expect(service().import([file], 't')).rejects.toThrow('Could not import the book.');
     respond(404);
     await expect(service().delete(1)).rejects.toThrow('Could not delete the book.');
   });

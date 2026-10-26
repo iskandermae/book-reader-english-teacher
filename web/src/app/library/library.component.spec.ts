@@ -27,12 +27,12 @@ describe('LibraryComponent', () => {
     return { fixture, el: fixture.nativeElement as HTMLElement };
   }
 
-  function choose(el: HTMLElement, name: string): File {
+  function choose(el: HTMLElement, ...names: string[]): File[] {
     const input = el.querySelector<HTMLInputElement>('input[type=file]')!;
-    const file = new File(['text'], name);
-    Object.defineProperty(input, 'files', { value: [file], configurable: true });
+    const files = names.map((name) => new File(['text'], name));
+    Object.defineProperty(input, 'files', { value: files, configurable: true });
     input.dispatchEvent(new Event('change'));
-    return file;
+    return files;
   }
 
   const buttons = (el: HTMLElement) => Array.from(el.querySelectorAll('button'));
@@ -72,17 +72,32 @@ describe('LibraryComponent', () => {
     expect(el.querySelector<HTMLInputElement>('input[name=title]')!.value).toBe('My Book.v2');
   });
 
+  it('lists several files in natural order, prefills the title from the first and sends all', async () => {
+    const importFn = vi.fn().mockResolvedValue(undefined);
+    const { fixture, el } = await render({ list: () => Promise.resolve([]), import: importFn });
+    const [ch10, ch2, ch1] = choose(el, 'ch10.txt', 'ch2.txt', 'Ch1.txt');
+    await settle(fixture);
+
+    const names = Array.from(el.querySelectorAll('ol[aria-label="Selected files"] li')).map((li) => li.textContent);
+    expect(names).toEqual(['Ch1.txt', 'ch2.txt', 'ch10.txt']);
+    expect(el.querySelector<HTMLInputElement>('input[name=title]')!.value).toBe('Ch1');
+
+    button(el, 'Import').click();
+    await settle(fixture);
+    expect(importFn).toHaveBeenCalledWith([ch1, ch2, ch10], 'Ch1');
+  });
+
   it('imports, refreshes the list and resets the form', async () => {
     const list = vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([book(1)]);
     const importFn = vi.fn().mockResolvedValue(undefined);
     const { fixture, el } = await render({ list, import: importFn });
-    const file = choose(el, 'a.txt');
+    const files = choose(el, 'a.txt');
     await settle(fixture);
 
     button(el, 'Import').click();
     await settle(fixture);
 
-    expect(importFn).toHaveBeenCalledWith(file, 'a');
+    expect(importFn).toHaveBeenCalledWith(files, 'a');
     expect(list).toHaveBeenCalledTimes(2);
     expect(el.querySelectorAll('li').length).toBe(1);
     expect(button(el, 'Import').disabled).toBe(true);

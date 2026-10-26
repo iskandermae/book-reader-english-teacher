@@ -52,16 +52,19 @@
         "tags": [
           "Books"
         ],
-        "summary": "Imports a .txt book: splits it into chapters and paragraphs and stores it.",
+        "summary": "Imports a book from one or more .txt files (merged in natural file-name order): splits it into chapters and paragraphs and stores it.",
         "requestBody": {
-          "description": "The .txt file and an optional title.",
+          "description": "The .txt files, sent as repeated `file` parts. They are merged in natural file-name order, not upload order.",
           "content": {
             "multipart/form-data": {
               "schema": {
                 "type": "object",
                 "properties": {
-                  "File": {
-                    "$ref": "#/components/schemas/IFormFile"
+                  "file": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/IFormFile"
+                    }
                   },
                   "Title": {
                     "type": "string"
@@ -94,7 +97,7 @@
             }
           },
           "400": {
-            "description": "The file is not .txt, is empty, is not UTF-8, or the chapter pattern setting is invalid; the detail field explains what to fix.",
+            "description": "No files, or a file is not .txt, is empty or is not UTF-8 (the detail names the file), or the chapter pattern setting is invalid. Nothing is saved.",
             "content": {
               "text/plain": {
                 "schema": {

@@ -93,6 +93,7 @@ Resolve every QA finding before closing the story: fix it, or drop it with a sho
 - Store all application data, including the database, settings, and generated files, in a `data` folder beside the executable.
 - Unit tests must be fast, deterministic, and independent of LLM availability.
 - Tests must not require network access unless explicitly classified as integration tests.
+- Do not commit performance tests (timing assertions). Write and run them once if needed, then delete them.
 
 ## Rules
 

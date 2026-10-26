@@ -38,6 +38,7 @@ All app data (database, settings, generated files) is stored in a `data` folder 
 Convert a book-style PDF into a `.txt` file formatted for import (requires `pip install pypdf`):
 ```bash
 python tools/pdf2txt.py book/hpmor-1.pdf
+python tools/pdf2txt_general.py in.pdf [out.txt]
 ```
 
 ## More

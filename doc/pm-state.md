@@ -1,12 +1,12 @@
 # PM State
 
-Last updated: 2026-10-25
+Last updated: 2026-10-26
 
 ## Phase
-Epic 0 DONE (not committed). Epic 1 in progress: S1.1 DONE, others TODO.
+Epic 0 DONE. Epic 1 in progress: S1.1-S1.7b DONE, S1.8 and S1.8b DONE (QA approved). Epic 1 stories all DONE; epic closure pending the slow-test answer.
 
 ## Next action
-S1.7 and S1.7b DONE, QA approved, uncommitted (user commits after review). Appearance is stored in the settings API (keys reader.fontSize/theme/width). Next: groom S1.8 (multi-file import). Open: unexpected edit to .claude/settings.json (Stop hook with macOS `afplay`) - not by our agents; user to confirm/keep. User manual checks: resume on a 1000-paragraph chapter; appearance in browser. Tool done (uncommitted): `tools/pdf2txt.py` (needs `pypdf`) made `book/hpmor-1.txt`, 20 chapters; tuned to this PDF only; user to import it in the app and test. S1.1-S1.6b are committed.
+Pick the next epic (Epic 2 AI text tools needs grooming). Slow perf test removed (decision: no committed performance tests; rule added to CLAUDE.md). Epic 1 can be closed. User manual checks done. Stop-hook sound changed to `tada.wav`. Only `README.md` is staged (not ours).
 
 ## Commit checklist for the user (Epic 0)
 - Commit `web/package-lock.json`.

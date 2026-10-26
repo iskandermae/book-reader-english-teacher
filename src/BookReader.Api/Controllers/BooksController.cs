@@ -4,10 +4,12 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace BookReader.Api.Controllers;
 
-/// <summary>Multipart form of the import request: a .txt book file and an optional title.</summary>
+/// <summary>Multipart form of the import request: one or more .txt files of a book and an optional title.</summary>
 public class ImportBookRequest
 {
-    public required IFormFile File { get; init; }
+    /// <summary>The .txt files, sent as repeated <c>file</c> parts. They are merged in natural file-name order, not upload order.</summary>
+    [FromForm(Name = "file")]
+    public List<IFormFile> Files { get; init; } = []; // not "required": zero files gets the service's clear 400 message
 
     public string? Title { get; init; }
 }
@@ -146,19 +148,27 @@ public class BooksController(IBookImportService importService, IBookLibraryServi
         await library.DeleteAsync(id, ct) ? NoContent() : NotFound();
 
     // Keep the "request" param doc last: the OpenAPI generator uses the last param doc as the request body description.
-    /// <summary>Imports a .txt book: splits it into chapters and paragraphs and stores it.</summary>
+    /// <summary>Imports a book from one or more .txt files (merged in natural file-name order): splits it into chapters and paragraphs and stores it.</summary>
     /// <param name="ct">Cancels the request.</param>
-    /// <param name="request">The .txt file and an optional title.</param>
+    /// <param name="request">The .txt files and an optional title (default: first file name without extension).</param>
     /// <response code="200">The book was imported.</response>
-    /// <response code="400">The file is not .txt, is empty, is not UTF-8, or the chapter pattern setting is invalid; the detail field explains what to fix.</response>
+    /// <response code="400">No files, or a file is not .txt, is empty or is not UTF-8 (the detail names the file), or the chapter pattern setting is invalid. Nothing is saved.</response>
     [HttpPost]
     [Consumes("multipart/form-data")]
     [ProducesResponseType<ImportBookResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
     public async Task<ImportBookResponse> Import([FromForm] ImportBookRequest request, CancellationToken ct)
     {
-        await using var stream = request.File.OpenReadStream();
-        var result = await importService.ImportAsync(stream, request.File.FileName, request.Title, ct);
-        return new ImportBookResponse(result.BookId, result.Title, result.ChapterCount);
+        var files = request.Files.Select(f => new BookImportFile(f.FileName, f.OpenReadStream())).ToList();
+        try
+        {
+            var result = await importService.ImportAsync(files, request.Title, ct);
+            return new ImportBookResponse(result.BookId, result.Title, result.ChapterCount);
+        }
+        finally
+        {
+            foreach (var file in files)
+                await file.Content.DisposeAsync();
+        }
     }
 }

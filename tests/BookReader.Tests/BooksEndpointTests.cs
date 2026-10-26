@@ -16,6 +16,26 @@ public sealed class BooksEndpointTests : ApiTestBase
     }
 
     [Fact]
+    public async Task Import_accepts_several_files_and_rejects_none()
+    {
+        await using var factory = NewApp();
+        using var client = factory.CreateClient();
+
+        var form = new MultipartFormDataContent
+        {
+            { new ByteArrayContent(Encoding.UTF8.GetBytes("Chapter 2: B\n\nTwo")), "file", "p10.txt" },
+            { new ByteArrayContent(Encoding.UTF8.GetBytes("Chapter 1: A\n\nOne")), "file", "p2.txt" },
+        };
+        var ok = await client.PostAsync("/api/books", form);
+        var body = await ok.Content.ReadFromJsonAsync<ImportBookResponse>();
+        Assert.Equal(new ImportBookResponse(body!.Id, "p2", 2), body);
+
+        var none = await client.PostAsync("/api/books", new MultipartFormDataContent { { new StringContent("T"), "title" } });
+        Assert.Equal(HttpStatusCode.BadRequest, none.StatusCode);
+        Assert.Contains("No files", await none.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
     public async Task Import_returns_id_title_and_chapter_count()
     {
         await using var factory = NewApp();

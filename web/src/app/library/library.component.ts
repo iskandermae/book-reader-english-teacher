@@ -2,6 +2,7 @@ import { DatePipe } from '@angular/common';
 import { Component, ElementRef, inject, OnInit, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { compareNatural } from './natural-sort';
 import { BookSummary, BooksService } from './books.service';
 
 @Component({
@@ -12,9 +13,16 @@ import { BookSummary, BooksService } from './books.service';
     <a routerLink="/settings">Settings</a>
 
     <form (ngSubmit)="upload()">
-      <p><label>File <input #picker type="file" name="file" accept=".txt" (change)="pick($event)" /></label></p>
+      <p><label>Files <input #picker type="file" name="file" accept=".txt" multiple (change)="pick($event)" /></label></p>
+      @if (files().length > 1) {
+        <ol aria-label="Selected files">
+          @for (f of files(); track $index) {
+            <li>{{ f.name }}</li>
+          }
+        </ol>
+      }
       <p><label>Title <input name="title" [(ngModel)]="title" /></label></p>
-      <button type="submit" [disabled]="!file() || uploading()">Import</button>
+      <button type="submit" [disabled]="files().length === 0 || uploading()">Import</button>
       @if (importError()) {
         <span role="alert">{{ importError() }}</span>
       }
@@ -54,7 +62,8 @@ export class LibraryComponent implements OnInit {
   protected readonly books = signal<BookSummary[]>([]);
   protected readonly loading = signal(true);
   protected readonly loadError = signal('');
-  protected readonly file = signal<File | null>(null);
+  // Selected files in natural name order (the order the server merges them in).
+  protected readonly files = signal<File[]>([]);
   private readonly picker = viewChild.required<ElementRef<HTMLInputElement>>('picker');
   protected title = '';
   protected readonly uploading = signal(false);
@@ -67,22 +76,24 @@ export class LibraryComponent implements OnInit {
   }
 
   protected pick(event: Event): void {
-    const file = (event.target as HTMLInputElement).files?.[0] ?? null;
-    this.file.set(file);
-    // Prefill the title from the file name without its extension; the user can still edit it.
-    this.title = file ? file.name.replace(/\.[^.]*$/, '') : '';
+    const files = Array.from((event.target as HTMLInputElement).files ?? []).sort((a, b) =>
+      compareNatural(a.name, b.name),
+    );
+    this.files.set(files);
+    // Prefill the title from the first file name without its extension; the user can still edit it.
+    this.title = files.length ? files[0].name.replace(/\.[^.]*$/, '') : '';
   }
 
   protected async upload(): Promise<void> {
-    const file = this.file();
-    if (!file || this.uploading()) {
+    const files = this.files();
+    if (files.length === 0 || this.uploading()) {
       return;
     }
     this.uploading.set(true);
     this.importError.set('');
     try {
-      await this.booksApi.import(file, this.title);
-      this.file.set(null);
+      await this.booksApi.import(files, this.title);
+      this.files.set([]);
       this.title = '';
       this.resetFileInput();
       await this.refresh();

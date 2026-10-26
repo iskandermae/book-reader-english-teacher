@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text;
 using BookReader.Core.Books;
 using BookReader.Core.Data;
@@ -29,7 +28,11 @@ public sealed class BookImportTests : IDisposable
         Import(Encoding.UTF8.GetBytes(text), fileName, title);
 
     private Task<BookImportResult> Import(byte[] bytes, string fileName = "my-book.txt", string? title = null) =>
-        _service.ImportAsync(new MemoryStream(bytes), fileName, title);
+        _service.ImportAsync([new BookImportFile(fileName, new MemoryStream(bytes))], title);
+
+    // Files are passed in the given (upload) order; the service must sort them itself.
+    private Task<BookImportResult> ImportMany(params (string Name, string Text)[] files) =>
+        _service.ImportAsync(files.Select(f => new BookImportFile(f.Name, new MemoryStream(Encoding.UTF8.GetBytes(f.Text)))).ToList(), null);
 
     private async Task<List<Chapter>> StoredChapters(int bookId) =>
         await _db.Chapters.Include(c => c.Paragraphs.OrderBy(p => p.Index)).Where(c => c.BookId == bookId).OrderBy(c => c.Index).ToListAsync();
@@ -146,6 +149,76 @@ public sealed class BookImportTests : IDisposable
         Assert.Contains("regular expression", ex.Message);
     }
 
+    [Theory]
+    [InlineData("2.txt", "10.txt")]
+    [InlineData("ch2.txt", "ch10.txt")]
+    [InlineData("CH2.txt", "ch10.txt")]
+    [InlineData("a02.txt", "a10.txt")]
+    [InlineData("ch1.txt", "ch1a.txt")]
+    public void Natural_order_compares_numbers_by_value_and_ignores_case(string first, string second)
+    {
+        Assert.True(NaturalFileNameComparer.Instance.Compare(first, second) < 0);
+        Assert.True(NaturalFileNameComparer.Instance.Compare(second, first) > 0);
+    }
+
+    [Fact]
+    public async Task Files_are_merged_in_natural_order_not_upload_order_and_title_comes_from_the_first()
+    {
+        var result = await ImportMany(
+            ("ch10.txt", "Chapter 3: C\n\nThree."),
+            ("ch2.txt", "Chapter 2: B\n\nTwo."),
+            ("Ch1.txt", "Chapter 1: A\n\nOne."));
+
+        Assert.Equal("Ch1", result.Title);
+        var chapters = await StoredChapters(result.BookId);
+        Assert.Equal(["Chapter 1: A", "Chapter 2: B", "Chapter 3: C"], chapters.Select(c => c.Title));
+    }
+
+    [Fact]
+    public async Task A_file_without_a_heading_continues_the_previous_chapter()
+    {
+        var result = await ImportMany(
+            ("2.txt", "More of chapter one."),
+            ("1.txt", "Chapter 1: A\n\nStart."));
+
+        var chapter = Assert.Single(await StoredChapters(result.BookId));
+        Assert.Equal(["Start.", "More of chapter one."], chapter.Paragraphs.Select(p => p.Text));
+    }
+
+    [Fact]
+    public async Task One_bad_file_rejects_the_whole_import_and_is_named()
+    {
+        var files = new List<BookImportFile>
+        {
+            new("good.txt", new MemoryStream(Encoding.UTF8.GetBytes("Chapter 1\n\nText"))),
+            new("bad.txt", new MemoryStream(Encoding.Latin1.GetBytes("Café"))),
+        };
+
+        var ex = await Assert.ThrowsAsync<BookImportException>(() => _service.ImportAsync(files, null));
+
+        Assert.Contains("bad.txt", ex.Message);
+        Assert.Contains("UTF-8", ex.Message);
+        Assert.Empty(_db.Books);
+    }
+
+    [Fact]
+    public async Task An_empty_file_among_several_is_named()
+    {
+        var ex = await Assert.ThrowsAsync<BookImportException>(() => ImportMany(("a.txt", "Text"), ("b.txt", " ")));
+
+        Assert.Contains("b.txt", ex.Message);
+        Assert.Contains("empty", ex.Message);
+        Assert.Empty(_db.Books);
+    }
+
+    [Fact]
+    public async Task Zero_files_gives_a_clear_error()
+    {
+        var ex = await Assert.ThrowsAsync<BookImportException>(() => _service.ImportAsync([], null));
+
+        Assert.Contains("No files", ex.Message);
+    }
+
     [Fact]
     public async Task Importing_the_same_book_twice_creates_two_books()
     {
@@ -164,27 +237,6 @@ public sealed class BookImportTests : IDisposable
         var result = await Import(await File.ReadAllBytesAsync(path), "1.txt");
 
         Assert.Equal(1, result.ChapterCount);
-    }
-
-    [Fact]
-    public async Task Large_generated_book_imports_within_a_few_seconds()
-    {
-        var text = new StringBuilder();
-        for (var chapter = 1; text.Length < 5_000_000; chapter++)
-        {
-            text.Append($"Chapter {chapter}: Generated\n\n");
-            for (var p = 0; p < 100; p++)
-                text.Append("Harry looked at the strange sentence and wondered how long it would take to read it all.\n\n");
-        }
-
-        // The limit is generous on purpose: typical runs take about a second, but a loaded CI machine must not make this flaky.
-        // It still catches real regressions (e.g. quadratic parsing).
-        var watch = Stopwatch.StartNew();
-        var result = await Import(text.ToString());
-        watch.Stop();
-
-        Assert.True(result.ChapterCount > 40);
-        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(10), $"Import took {watch.Elapsed}.");
     }
 
     private static string FindRepoRoot()
