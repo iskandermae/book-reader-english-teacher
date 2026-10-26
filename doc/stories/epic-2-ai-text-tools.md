@@ -13,12 +13,19 @@ Depends on: Epic 1. MVP is complete after S2.7.
 - Unit tests with a fake provider (status, models, streaming, error mapping); no network, no Ollama. The Ollama implementation is covered by one optional integration test, excluded from the default run (category/trait).
 - Out of scope: frontend, model picker UI (S2.6), prompts (S2.3+), cloud providers.
 
-## S2.2 Text selection toolbar — Story — TODO
+## S2.2 Text selection toolbar — Story (frontend only) — DONE
 **Acceptance**
-- Selecting text in the reader shows a floating toolbar near the selection.
-- The selected text and its surrounding sentence are captured as context.
-- Toolbar hides when the selection is cleared.
-- Works with mouse and keyboard selection.
+- Selecting text inside the chapter text (`article p`) shows a floating toolbar just above the selection (below it if there is no room above), kept inside the viewport.
+- Selection is captured as `{ text, context }`. `text` is the trimmed selection. `context` is the full sentence(s) containing the selection, taken from the same paragraph only. If the selection spans several paragraphs, context is those paragraphs' text. Sentence split is simple (`. ! ?` followed by space); no NLP.
+- The capture logic is a pure function in its own file (not inside `ReaderComponent`) and is unit tested: one sentence, selection in the middle sentence, first/last sentence, paragraph without punctuation, multi-paragraph, whitespace-only selection.
+- The toolbar is its own small component; the reader exposes the current selection to it via a signal. Buttons are added by S2.3-S2.5; here the toolbar only shows a short preview of the selected text (so the user can verify it).
+- Toolbar hides when the selection is collapsed/cleared, when the chapter changes, and on selection outside the chapter text (menus, settings, nav).
+- Works with mouse and keyboard (Shift+arrows) selection; updates on `selectionchange` (debounced, no per-keystroke work).
+- Clicking the toolbar must not clear the selection (mousedown prevented).
+- Listeners are removed on destroy.
+- Tests: component test that a selection event shows and clears the toolbar (jsdom Selection mocked); no real positioning asserted.
+- Out of scope: actions/buttons, API calls, touch-specific handles, highlighting saved selections.
+- Assumption: no buttons yet, so the user verifies by selecting text and seeing the preview.
 
 ## S2.3 Translate selection — Story — TODO
 **Acceptance**

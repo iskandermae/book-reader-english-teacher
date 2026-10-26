@@ -301,4 +301,62 @@ describe('ReaderComponent', () => {
       expect(el.querySelector('[role=alert]')).toBeNull();
     });
   });
+
+  describe('selection toolbar', () => {
+    const toolbar = (el: HTMLElement) => el.querySelector('app-selection-toolbar');
+    // jsdom has no layout, so ranges have no rectangle; positioning itself is not asserted.
+    beforeEach(() => {
+      Range.prototype.getBoundingClientRect = () => new DOMRect(10, 100, 50, 20);
+    });
+
+    /** Selects the whole text of `node` (or clears the selection) and lets the debounce fire. */
+    async function selectText(harness: { detectChanges(): void }, node: Node | null) {
+      const selection = window.getSelection()!;
+      selection.removeAllRanges();
+      if (node) {
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        selection.addRange(range);
+      }
+      document.dispatchEvent(new Event('selectionchange'));
+      await vi.advanceTimersByTimeAsync(200);
+      harness.detectChanges();
+    }
+
+    it('shows a preview for a selection in the chapter text and hides it when cleared', async () => {
+      const { harness, el } = await open('/books/5');
+      vi.useFakeTimers();
+      await selectText(harness, el.querySelector('article p'));
+      expect(toolbar(el)!.textContent).toContain('first 0');
+      await selectText(harness, null);
+      expect(toolbar(el)).toBeNull();
+    });
+
+    it('ignores a selection outside the chapter text', async () => {
+      const { harness, el } = await open('/books/5');
+      vi.useFakeTimers();
+      await selectText(harness, el.querySelector('h1'));
+      expect(toolbar(el)).toBeNull();
+    });
+
+    it('hides when the chapter changes', async () => {
+      const { harness, el } = await open('/books/5');
+      vi.useFakeTimers();
+      await selectText(harness, el.querySelector('article p'));
+      expect(toolbar(el)).not.toBeNull();
+      vi.useRealTimers();
+      button(el, 'Next').click();
+      await harness.fixture.whenStable();
+      harness.detectChanges();
+      expect(el.querySelector('h2')!.textContent).toBe('Chapter 1');
+      expect(toolbar(el)).toBeNull();
+    });
+
+    it('stops listening after destroy', async () => {
+      const { harness } = await open('/books/5');
+      const remove = vi.spyOn(document, 'removeEventListener');
+      harness.fixture.destroy();
+      expect(remove).toHaveBeenCalledWith('selectionchange', expect.any(Function));
+    });
+  });
 });

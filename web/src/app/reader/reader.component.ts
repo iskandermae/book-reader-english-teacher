@@ -3,13 +3,16 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
 import { APPEARANCE_OPTIONS, AppearanceKey, AppearanceService } from '../appearance/appearance.service';
+import { captureSelection, TextSelection } from './capture-selection';
+import { SelectionToolbarComponent } from './selection-toolbar.component';
 import { BookChapters, Chapter, ReaderService, ReadingPosition } from './reader.service';
 
 const SAVE_DELAY_MS = 1000;
+const SELECTION_DELAY_MS = 150;
 
 @Component({
   selector: 'app-reader',
-  imports: [RouterLink],
+  imports: [RouterLink, SelectionToolbarComponent],
   styles: `
     .layout { display: flex; gap: 1rem; align-items: flex-start; }
     nav { min-width: 14rem; max-width: 18rem; }
@@ -75,6 +78,9 @@ const SAVE_DELAY_MS = 1000;
           }
         </article>
       </div>
+      @if (selection(); as current) {
+        <app-selection-toolbar [selection]="current.selection" [anchor]="current.anchor" />
+      }
     }
   `,
 })
@@ -112,6 +118,10 @@ export class ReaderComponent {
   // Closed by default on narrow screens (matchMedia is missing in some test environments).
   protected readonly panelOpen = signal(window.matchMedia?.('(min-width: 800px)').matches ?? true);
 
+  // The text currently selected inside the chapter, with its viewport rectangle; null when nothing usable is selected.
+  protected readonly selection = signal<{ selection: TextSelection; anchor: DOMRect } | null>(null);
+  private selectionTimer: ReturnType<typeof setTimeout> | undefined;
+
   // Guards against a slow earlier response overwriting a newer one.
   private loadToken = 0;
   private loadedBookId: number | null = null;
@@ -126,7 +136,15 @@ export class ReaderComponent {
 
   constructor() {
     effect(() => void this.load(this.bookId(), this.requestedChapter()));
+    // selectionchange fires on every Shift+arrow press, so the work is debounced.
+    const onSelectionChange = () => {
+      clearTimeout(this.selectionTimer);
+      this.selectionTimer = setTimeout(() => this.updateSelection(), SELECTION_DELAY_MS);
+    };
+    document.addEventListener('selectionchange', onSelectionChange);
     inject(DestroyRef).onDestroy(() => {
+      document.removeEventListener('selectionchange', onSelectionChange);
+      clearTimeout(this.selectionTimer);
       // Invalidate any in-flight load so it cannot save or start observing after destroy.
       this.loadToken++;
       this.stopObserving();
@@ -142,10 +160,18 @@ export class ReaderComponent {
     void this.router.navigate([], { queryParams: { chapter: index }, queryParamsHandling: 'merge' });
   }
 
+  private updateSelection(): void {
+    const article = this.host.nativeElement.querySelector('article');
+    const sel = window.getSelection();
+    const captured = article && captureSelection(sel, article);
+    this.selection.set(captured ? { selection: captured, anchor: sel!.getRangeAt(0).getBoundingClientRect() } : null);
+  }
+
   private async load(bookId: number, requested: number | null): Promise<void> {
     const token = ++this.loadToken;
     this.error.set('');
     this.chapter.set(null);
+    this.selection.set(null);
     this.stopObserving();
     // A pending save of the previous chapter is superseded by this load; another book's save must still go out.
     if (this.pending && this.pending.bookId !== bookId) this.flush();

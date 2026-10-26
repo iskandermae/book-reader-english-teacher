@@ -3,10 +3,10 @@
 Last updated: 2026-10-26
 
 ## Phase
-Epic 0 and Epic 1 DONE. Epic 2 in progress: S2.1 DONE (QA approved after 1 fix round). S2.2-S2.7 TODO (need grooming).
+Epic 0 and Epic 1 DONE. Epic 2 in progress: S2.1, S2.2 DONE. S2.3-S2.7 TODO (need grooming).
 
 ## Next action
-S1.9/S1.9b DONE (QA approved, minors fixed). Groom S2.2 (text selection toolbar, frontend only), then frontend-dev.
+S2.2 DONE (QA approved, minors fixed, 73/73 tests, build OK). Groom S2.3 (translate selection; needs backend prompt endpoint + side panel), then backend-dev first.
 
 ## Commit checklist for the user (Epic 0)
 - Commit `web/package-lock.json`.

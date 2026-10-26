@@ -119,7 +119,7 @@ Resolve every QA finding before closing the story: fix it, or drop it with a sho
 
 ## Way of working
 Do 1 story at a time, not epic in 1 go.
-Order: the backend part of the story comes before its frontend part.
+Order: the backend part of the story comes before its frontend part, but in one commit.
 Use short, simple, and direct language when communicating with the user and worker agents.
 Organize user stories into epics. New stories have a `TODO` suffix until they are groomed.
 Highlight ambiguities, missing information, missing steps, risks, and dependencies. Suggest a concrete next action.
