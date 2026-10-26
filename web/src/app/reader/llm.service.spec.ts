@@ -1,0 +1,50 @@
+import { LlmService } from './llm.service';
+
+const sse = (...parts: string[]) =>
+  new Response(parts.join(''), { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+const problem = (status: number, detail: string) =>
+  new Response(JSON.stringify({ detail }), { status, headers: { 'Content-Type': 'application/problem+json' } });
+
+describe('LlmService.translate', () => {
+  const service = new LlmService();
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  async function collect(signal = new AbortController().signal) {
+    const chunks: string[] = [];
+    for await (const c of service.translate('hello', 'hello world', signal)) chunks.push(c);
+    return chunks;
+  }
+
+  it('yields the chunks and skips the final done event', async () => {
+    fetchMock.mockResolvedValue(sse('data: "He"\n\n', 'data: "llo"\n\n', 'event: done\ndata: \n\n'));
+    expect(await collect()).toEqual(['He', 'llo']);
+    const request: Request = fetchMock.mock.calls[0][0];
+    expect(new URL(request.url).pathname).toBe('/api/llm/translate');
+    expect(await request.json()).toEqual({ text: 'hello', context: 'hello world' });
+  });
+
+  it('throws the problem detail of a rejected request', async () => {
+    fetchMock.mockResolvedValue(problem(503, 'Ollama is not running. Start it.'));
+    await expect(collect()).rejects.toThrow('Ollama is not running. Start it.');
+  });
+
+  it('throws the message of an error event sent mid-stream', async () => {
+    fetchMock.mockResolvedValue(sse('data: "He"\n\n', 'event: error\ndata: "Model crashed"\n\n'));
+    await expect(collect()).rejects.toThrow('Model crashed');
+  });
+
+  it('ends quietly when aborted', async () => {
+    const abort = new AbortController();
+    fetchMock.mockImplementation(async () => {
+      abort.abort();
+      throw new DOMException('aborted', 'AbortError');
+    });
+    expect(await collect(abort.signal)).toEqual([]);
+  });
+});

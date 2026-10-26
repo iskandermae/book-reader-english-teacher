@@ -9,6 +9,10 @@ public interface ISettingsService
     /// <summary>All known settings; keys never saved yet have their default value.</summary>
     Task<IReadOnlyDictionary<string, string>> GetAllAsync(CancellationToken ct = default);
 
+    /// <summary>One known setting (the saved value, or its default). Reads a single row instead of all settings.</summary>
+    /// <exception cref="KeyNotFoundException">The key is not a known setting.</exception>
+    Task<string> GetAsync(string key, CancellationToken ct = default);
+
     /// <summary>Validates and saves the given values (all or nothing), then returns all settings.</summary>
     /// <exception cref="SettingsValidationException">Unknown key, null value or value that is too long, or a value outside the allowed set of a reader setting.</exception>
     Task<IReadOnlyDictionary<string, string>> UpdateAsync(IReadOnlyDictionary<string, string?> values, CancellationToken ct = default);
@@ -53,6 +57,13 @@ public class SettingsService(AppDbContext db) : ISettingsService
         var stored = await db.Settings.AsNoTracking().ToDictionaryAsync(s => s.Key, s => s.Value, ct);
         // Defaults first, so removing a known key later never leaks stale rows into the API.
         return Defaults.ToDictionary(d => d.Key, d => stored.GetValueOrDefault(d.Key, d.Value));
+    }
+
+    public async Task<string> GetAsync(string key, CancellationToken ct = default)
+    {
+        var fallback = Defaults[key];
+        var stored = await db.Settings.AsNoTracking().Where(s => s.Key == key).Select(s => s.Value).FirstOrDefaultAsync(ct);
+        return stored ?? fallback;
     }
 
     public async Task<IReadOnlyDictionary<string, string>> UpdateAsync(

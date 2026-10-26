@@ -37,6 +37,17 @@ public sealed class SettingsServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Get_returns_default_then_saved_value_and_rejects_unknown_key()
+    {
+        Assert.Equal("Ukrainian", await _service.GetAsync(SettingsService.LanguageNative));
+
+        await _service.UpdateAsync(new Dictionary<string, string?> { [SettingsService.LanguageNative] = "German" });
+
+        Assert.Equal("German", await _service.GetAsync(SettingsService.LanguageNative));
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => _service.GetAsync("nope"));
+    }
+
+    [Fact]
     public async Task Update_saves_values_and_overwrites_existing_ones()
     {
         await _service.UpdateAsync(new Dictionary<string, string?> { [SettingsService.OllamaModel] = "a" });

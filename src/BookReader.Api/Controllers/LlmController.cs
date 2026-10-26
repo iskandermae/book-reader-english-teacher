@@ -58,7 +58,7 @@ public class LlmController(ILlmProvider llm, ISettingsService settings) : Contro
         if (string.IsNullOrWhiteSpace(request.Text))
             return BadRequest(new ProblemDetails { Title = "Invalid text", Detail = "Text must not be empty." });
 
-        var language = (await settings.GetAllAsync(ct))[SettingsService.LanguageNative];
+        var language = await settings.GetAsync(SettingsService.LanguageNative, ct);
         if (string.IsNullOrWhiteSpace(language))
             throw new LlmNotConfiguredException("Set your native language in settings.");
 

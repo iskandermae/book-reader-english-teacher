@@ -178,6 +178,8 @@ export class ReaderComponent {
     this.aiPanel.set({ title: 'Translation', text: '', error: '', loading: true });
     try {
       for await (const chunk of this.llm.translate(text, context, request.signal)) {
+        // A replaced or closed request must not write into a newer panel.
+        if (this.aiRequest !== request) break;
         this.aiPanel.update((p) => p && { ...p, text: p.text + chunk, loading: false });
       }
     } catch (e) {
@@ -207,6 +209,7 @@ export class ReaderComponent {
     this.error.set('');
     this.chapter.set(null);
     this.selection.set(null);
+    this.closeAiPanel(); // the result belongs to the text of the previous chapter
     this.stopObserving();
     // A pending save of the previous chapter is superseded by this load; another book's save must still go out.
     if (this.pending && this.pending.bookId !== bookId) this.flush();

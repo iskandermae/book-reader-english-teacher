@@ -14,8 +14,13 @@ public class TranslatePromptTests
     }
 
     [Fact]
-    public void Prompt_asks_for_translation_only()
+    public void Prompt_asks_for_native_and_literal_lines_without_extras()
     {
-        Assert.Contains("Reply with the translation only", TranslatePrompt.Build("x", "German"));
+        var prompt = TranslatePrompt.Build("x", "German");
+
+        Assert.Contains("No preface", prompt);
+        Assert.Contains("Native:", prompt);
+        Assert.Contains("Literal:", prompt);
+        Assert.DoesNotContain("translation only", prompt);
     }
 }

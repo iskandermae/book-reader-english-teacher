@@ -10,7 +10,7 @@ namespace BookReader.Core.Llm;
 /// Ollama implementation (decisions D5, D6). Url and model are read from settings on every call,
 /// so a change in settings applies at once, without a restart.
 /// </summary>
-public class OllamaProvider(ISettingsService settings) : ILlmProvider
+public class OllamaProvider(ISettingsService settings, HttpMessageHandler? handler = null) : ILlmProvider
 {
     // Short limit for quick checks only; generation itself can legitimately take minutes.
     private static readonly TimeSpan CheckTimeout = TimeSpan.FromSeconds(5);
@@ -87,8 +87,9 @@ public class OllamaProvider(ISettingsService settings) : ILlmProvider
     }
 
     // The handler is shared, so the HttpClient must not dispose it. The url is validated when it is saved.
-    private static OllamaApiClient CreateClient(string url, string model) =>
-        new(new HttpClient(SharedHandler, disposeHandler: false)
+    // The optional handler lets tests replace the network.
+    private OllamaApiClient CreateClient(string url, string model) =>
+        new(new HttpClient(handler ?? SharedHandler, disposeHandler: false)
         {
             BaseAddress = new Uri(url),
             Timeout = Timeout.InfiniteTimeSpan, // long generations; callers cancel through the token

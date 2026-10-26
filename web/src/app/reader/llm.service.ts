@@ -15,9 +15,9 @@ export class LlmService {
       body: { text, context },
       signal,
       // The generated client hides the response body of a failed request, so read the problem details here.
-      fetch: async (request: Request) => {
+      fetch: async (...args: Parameters<typeof fetch>) => {
         try {
-          const response = await fetch(request);
+          const response = await fetch(...args);
           if (!response.ok) {
             const problem = await response.json().catch(() => null);
             requestError = problem?.detail ?? 'The AI request failed.';

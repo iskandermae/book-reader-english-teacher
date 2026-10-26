@@ -5,13 +5,21 @@ namespace BookReader.Tests;
 
 public sealed class OllamaProviderTests
 {
-    // Port 1 on localhost refuses the connection at once: a deterministic "Ollama is down" without any real server.
+    // "Ollama is down" without any socket: the handler fails like a refused connection (a real one takes ~2 s on Windows).
     private const string DeadUrl = "http://127.0.0.1:1";
+
+    private sealed class RefusedConnectionHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) =>
+            throw new HttpRequestException("Connection refused");
+    }
+
+    private static OllamaProvider DeadProvider(string model) => new(new FixedSettings(DeadUrl, model), new RefusedConnectionHandler());
 
     [Fact]
     public async Task Status_when_server_is_down_does_not_throw_and_gives_a_hint()
     {
-        var status = await Provider(DeadUrl, "m").GetStatusAsync();
+        var status = await DeadProvider("m").GetStatusAsync();
 
         Assert.False(status.Available);
         Assert.Equal(DeadUrl, status.Url);
@@ -21,7 +29,7 @@ public sealed class OllamaProviderTests
     [Fact]
     public async Task Models_when_server_is_down_throws_unavailable()
     {
-        await Assert.ThrowsAsync<LlmUnavailableException>(() => Provider(DeadUrl, "m").ListModelsAsync());
+        await Assert.ThrowsAsync<LlmUnavailableException>(() => DeadProvider("m").ListModelsAsync());
     }
 
     [Fact]
@@ -29,7 +37,7 @@ public sealed class OllamaProviderTests
     {
         await Assert.ThrowsAsync<LlmNotConfiguredException>(async () =>
         {
-            await foreach (var _ in Provider(DeadUrl, "").GenerateAsync("hi")) { }
+            await foreach (var _ in DeadProvider("").GenerateAsync("hi")) { }
         });
     }
 
@@ -38,7 +46,7 @@ public sealed class OllamaProviderTests
     {
         await Assert.ThrowsAsync<LlmUnavailableException>(async () =>
         {
-            await foreach (var _ in Provider(DeadUrl, "m").GenerateAsync("hi")) { }
+            await foreach (var _ in DeadProvider("m").GenerateAsync("hi")) { }
         });
     }
 
@@ -89,6 +97,8 @@ public sealed class OllamaProviderTests
                 [SettingsService.OllamaUrl] = url,
                 [SettingsService.OllamaModel] = model,
             });
+
+        public async Task<string> GetAsync(string key, CancellationToken ct = default) => (await GetAllAsync(ct))[key];
 
         public Task<IReadOnlyDictionary<string, string>> UpdateAsync(IReadOnlyDictionary<string, string?> values, CancellationToken ct = default) =>
             throw new NotSupportedException();

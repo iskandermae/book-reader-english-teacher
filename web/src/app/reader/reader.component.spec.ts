@@ -3,6 +3,7 @@ import { provideRouter, Router } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { ReaderComponent } from './reader.component';
 import { Chapter, ReaderService } from './reader.service';
+import { LlmService } from './llm.service';
 import { SettingsService } from '../settings/settings.service';
 
 const chapters = [0, 1, 2].map((index) => ({ index, title: `Chapter ${index}` }));
@@ -30,6 +31,7 @@ describe('ReaderComponent', () => {
   type Mock = ReturnType<typeof vi.fn>;
   let api: { chapters: Mock; chapter: Mock; position: Mock; savePosition: Mock };
   let settings: { load: Mock; save: Mock };
+  let llm: { translate: Mock };
   const observer = () => FakeObserver.instances[FakeObserver.instances.length - 1];
 
   beforeEach(() => {
@@ -39,6 +41,7 @@ describe('ReaderComponent', () => {
     FakeObserver.instances = [];
     vi.stubGlobal('IntersectionObserver', FakeObserver);
     settings = { load: vi.fn().mockResolvedValue({}), save: vi.fn().mockResolvedValue({}) };
+    llm = { translate: vi.fn() };
     api = {
       chapters: vi.fn().mockResolvedValue({ title: 'My Book', chapters }),
       position: vi.fn().mockResolvedValue({ chapterIndex: 0, paragraphIndex: 0 }),
@@ -51,6 +54,7 @@ describe('ReaderComponent', () => {
         provideRouter([{ path: 'books/:id', component: ReaderComponent }]),
         { provide: ReaderService, useValue: api },
         { provide: SettingsService, useValue: settings },
+        { provide: LlmService, useValue: llm },
       ],
     });
   });
@@ -357,6 +361,104 @@ describe('ReaderComponent', () => {
       const remove = vi.spyOn(document, 'removeEventListener');
       harness.fixture.destroy();
       expect(remove).toHaveBeenCalledWith('selectionchange', expect.any(Function));
+    });
+  });
+
+  describe('translate', () => {
+    const panel = (el: HTMLElement) => el.querySelector('app-ai-panel');
+
+    /** A stream the test feeds by hand; records the abort signal the reader passed in. */
+    function controlledStream() {
+      const queue: Array<string | Error | null> = [];
+      let wake: (() => void) | undefined;
+      const push = (item: string | Error | null) => {
+        queue.push(item);
+        wake?.();
+      };
+      const signals: AbortSignal[] = [];
+      llm.translate.mockImplementation(async function* (_t: string, _c: string, signal: AbortSignal) {
+        signals.push(signal);
+        while (true) {
+          while (!queue.length) await new Promise<void>((r) => (wake = r));
+          const item = queue.shift()!;
+          if (item === null) return;
+          if (item instanceof Error) throw item;
+          yield item;
+        }
+      });
+      return { push, signals };
+    }
+
+    async function openAndTranslate() {
+      Range.prototype.getBoundingClientRect = () => new DOMRect(10, 100, 50, 20);
+      const opened = await open('/books/5');
+      const selection = window.getSelection()!;
+      const range = document.createRange();
+      range.selectNodeContents(opened.el.querySelector('article p')!);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      vi.useFakeTimers();
+      document.dispatchEvent(new Event('selectionchange'));
+      await vi.advanceTimersByTimeAsync(200);
+      vi.useRealTimers();
+      opened.harness.detectChanges();
+      button(opened.el, 'Translate').click();
+      return opened;
+    }
+
+    /** Lets the reader consume what the test pushed and re-renders. */
+    const settle = async (harness: { detectChanges(): void }) => {
+      await new Promise((r) => setTimeout(r));
+      harness.detectChanges();
+    };
+
+    it('streams the translation into the panel for the selected text and its context', async () => {
+      const stream = controlledStream();
+      const { harness, el } = await openAndTranslate();
+      stream.push('Пер');
+      stream.push('ший');
+      await settle(harness);
+      expect(llm.translate).toHaveBeenCalledWith('first 0', 'first 0', expect.any(AbortSignal));
+      expect(panel(el)!.textContent).toContain('Перший');
+      stream.push(null);
+    });
+
+    it('shows the error with its hint in the panel', async () => {
+      const stream = controlledStream();
+      const { harness, el } = await openAndTranslate();
+      stream.push(new Error('Ollama is not running. Start it.'));
+      await settle(harness);
+      expect(panel(el)!.querySelector('[role=alert]')!.textContent).toContain('Ollama is not running. Start it.');
+    });
+
+    it('cancels the running request when the panel is closed', async () => {
+      const stream = controlledStream();
+      const { harness, el } = await openAndTranslate();
+      await settle(harness);
+      button(panel(el) as HTMLElement, 'Close').click();
+      harness.detectChanges();
+      expect(stream.signals[0].aborted).toBe(true);
+      expect(panel(el)).toBeNull();
+    });
+
+    it('closes the panel and cancels the request when the chapter changes', async () => {
+      const stream = controlledStream();
+      const { harness, el } = await openAndTranslate();
+      await settle(harness);
+      button(el, 'Next').click();
+      await harness.fixture.whenStable();
+      harness.detectChanges();
+      expect(stream.signals[0].aborted).toBe(true);
+      expect(panel(el)).toBeNull();
+    });
+
+    it('cancels the running request when a new one starts', async () => {
+      const stream = controlledStream();
+      const { harness, el } = await openAndTranslate();
+      await settle(harness);
+      button(el, 'Translate').click();
+      await settle(harness);
+      expect(stream.signals.map((s) => s.aborted)).toEqual([true, false]);
     });
   });
 });
