@@ -26,7 +26,10 @@ public sealed class SettingsServiceTests : IDisposable
     {
         var all = await _service.GetAllAsync();
 
-        Assert.Equal(3, all.Count);
+        Assert.Equal(6, all.Count);
+        Assert.Equal("medium", all[SettingsService.ReaderFontSize]);
+        Assert.Equal("light", all[SettingsService.ReaderTheme]);
+        Assert.Equal("medium", all[SettingsService.ReaderWidth]);
         Assert.Equal("", all[SettingsService.OllamaModel]); // never hardcoded (D12)
         Assert.Equal("", all[SettingsService.UiSample]);
     }
@@ -71,6 +74,51 @@ public sealed class SettingsServiceTests : IDisposable
     {
         await Assert.ThrowsAsync<SettingsValidationException>(() => _service.UpdateAsync(
             new Dictionary<string, string?> { [SettingsService.UiSample] = null }));
+    }
+
+    [Fact]
+    public async Task Update_saves_reader_settings_and_reads_them_back()
+    {
+        var all = await _service.UpdateAsync(new Dictionary<string, string?>
+        {
+            [SettingsService.ReaderFontSize] = "xlarge",
+            [SettingsService.ReaderTheme] = "dark",
+            [SettingsService.ReaderWidth] = "wide",
+        });
+
+        Assert.Equal("xlarge", all[SettingsService.ReaderFontSize]);
+        Assert.Equal("dark", (await _service.GetAllAsync())[SettingsService.ReaderTheme]);
+        Assert.Equal("wide", (await _service.GetAllAsync())[SettingsService.ReaderWidth]);
+    }
+
+    [Theory]
+    [InlineData(SettingsService.ReaderFontSize, "huge")]
+    [InlineData(SettingsService.ReaderFontSize, "")]
+    [InlineData(SettingsService.ReaderTheme, "blue")]
+    [InlineData(SettingsService.ReaderTheme, "Dark")] // case-sensitive: the API has one spelling
+    [InlineData(SettingsService.ReaderWidth, "full")]
+    public async Task Update_rejects_bad_reader_value(string key, string value)
+    {
+        var ex = await Assert.ThrowsAsync<SettingsValidationException>(() => _service.UpdateAsync(
+            new Dictionary<string, string?> { [key] = value }));
+
+        Assert.Contains($"'{key}'", ex.Message);
+    }
+
+    [Fact]
+    public async Task Update_with_valid_and_invalid_reader_values_saves_nothing()
+    {
+        await Assert.ThrowsAsync<SettingsValidationException>(() => _service.UpdateAsync(
+            new Dictionary<string, string?>
+            {
+                [SettingsService.ReaderTheme] = "dark",
+                [SettingsService.ReaderWidth] = "full",
+                [SettingsService.UiSample] = "x",
+            }));
+
+        var all = await _service.GetAllAsync();
+        Assert.Equal("light", all[SettingsService.ReaderTheme]);
+        Assert.Equal("", all[SettingsService.UiSample]);
     }
 
     [Fact]

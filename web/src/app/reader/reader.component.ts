@@ -2,6 +2,7 @@ import { afterNextRender, Component, computed, DestroyRef, effect, ElementRef, i
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
+import { APPEARANCE_OPTIONS, AppearanceKey, AppearanceService } from '../appearance/appearance.service';
 import { BookChapters, Chapter, ReaderService, ReadingPosition } from './reader.service';
 
 const SAVE_DELAY_MS = 1000;
@@ -13,7 +14,13 @@ const SAVE_DELAY_MS = 1000;
     .layout { display: flex; gap: 1rem; align-items: flex-start; }
     nav { min-width: 14rem; max-width: 18rem; }
     nav button.current { font-weight: bold; }
-    article { flex: 1; }
+    article { flex: 1; margin: 0 auto; font-size: var(--reader-font-size, 1rem); max-width: var(--reader-width, 45rem); }
+    /* Appearance is two attributes on <article>; paragraphs only inherit, so a long chapter costs nothing extra. */
+    article[data-font=small] { --reader-font-size: 0.875rem; }
+    article[data-font=large] { --reader-font-size: 1.25rem; }
+    article[data-font=xlarge] { --reader-font-size: 1.5rem; }
+    article[data-width=narrow] { --reader-width: 32rem; }
+    article[data-width=wide] { --reader-width: 60rem; }
     /* A chapter is rendered whole; the browser skips layout/paint of off-screen paragraphs. */
     article p { content-visibility: auto; contain-intrinsic-size: auto 5rem; }
   `,
@@ -26,6 +33,21 @@ const SAVE_DELAY_MS = 1000;
     } @else {
       <h1>{{ book()!.title }}</h1>
       <button type="button" (click)="panelOpen.set(!panelOpen())">Chapters</button>
+      <fieldset>
+        <legend>Appearance</legend>
+        @for (c of controls; track c.key) {
+          <label>{{ c.label }}
+            <select [attr.name]="c.key" (change)="choose(c.key, $any($event.target).value)">
+              @for (o of c.options; track o) {
+                <option [value]="o" [selected]="appearance.values()[c.key] === o">{{ o }}</option>
+              }
+            </select>
+          </label>
+        }
+      </fieldset>
+      @if (appearance.saveError()) {
+        <p role="alert">{{ appearance.saveError() }}</p>
+      }
       <div class="layout">
         @if (panelOpen()) {
           <nav>
@@ -38,7 +60,7 @@ const SAVE_DELAY_MS = 1000;
             }
           </nav>
         }
-        <article>
+        <article [attr.data-font]="appearance.values()['reader.fontSize']" [attr.data-width]="appearance.values()['reader.width']">
           @if (chapter(); as chapter) {
           <h2>{{ chapter.title }}</h2>
           <button type="button" [disabled]="chapterIndex() <= 0" (click)="open(chapterIndex() - 1)">Previous</button>
@@ -60,6 +82,13 @@ export class ReaderComponent {
   private readonly api = inject(ReaderService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+
+  protected readonly appearance = inject(AppearanceService);
+  protected readonly controls = [
+    { key: 'reader.fontSize', label: 'Font size' },
+    { key: 'reader.theme', label: 'Theme' },
+    { key: 'reader.width', label: 'Width' },
+  ].map((c) => ({ ...c, key: c.key as AppearanceKey, options: APPEARANCE_OPTIONS[c.key as AppearanceKey] }));
 
   private readonly injector = inject(Injector);
   private readonly host = inject(ElementRef<HTMLElement>);
@@ -103,6 +132,10 @@ export class ReaderComponent {
       this.stopObserving();
       this.flush();
     });
+  }
+
+  protected choose(key: AppearanceKey, value: string): void {
+    void this.appearance.set(key, value);
   }
 
   protected open(index: number): void {

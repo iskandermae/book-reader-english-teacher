@@ -86,10 +86,28 @@ Decisions (defaults, change if you disagree): current paragraph = the first para
 - Unit tests (Vitest, client mocked, fake timers): resume at saved paragraph, debounce gives one call, chapter change saves, flush on destroy, `?chapter` overrides saved position.
 Verify: dev runs `npm test -- --watch=false` and `npm run build`; QA reads the code.
 
-## S1.7 Reader appearance — Story — TODO
+## S1.7 Reader appearance settings (backend) — Story — DONE
+As a reader my appearance choices are stored with the app data.
+Decisions (defaults, change if you disagree): stored in the existing settings API (S0.5), so they live in the SQLite file in `data` (project rule) and survive a browser change. Three new known keys, all strings, validated on PUT (400 with a clear message on a bad value): `reader.fontSize` = `small|medium|large|xlarge` (default `medium`); `reader.theme` = `light|dark` (default `light`); `reader.width` = `narrow|medium|wide` (default `medium`). Empty string is not allowed for these keys. `ui.sample` is kept.
 **Acceptance**
-- Font size, light/dark theme, text column width.
-- Settings persist across sessions.
+- `GET /api/settings` returns the three keys with defaults when never saved.
+- `PUT /api/settings` accepts valid values, rejects invalid ones (400, nothing saved, other keys in the same request not saved either).
+- Values survive restart (SQLite).
+- Unit tests (fast, no network): defaults, save and read back, each key with a bad value, mixed valid+invalid request saves nothing. One HTTP-level test for a bad value. `api/openapi.json` regenerated if it changes.
+Verify: dev runs tests.
+
+## S1.7b Reader appearance (frontend) — Story — DONE
+As a reader I can change font size, theme and column width, and they stay as I set them.
+Depends on S1.7.
+Decisions (defaults, change if you disagree): controls live in a small "Appearance" panel on the reader page. Changes apply at once and are saved through `PUT /api/settings` (debounce not needed). Theme applies to the whole app (not only the reader) via a class on the root element; font size and width apply to the reader text only. Settings are loaded once at app start so there is no flash of the wrong theme beyond the first paint. Failed save keeps the new look for the session and shows a short message. The generic Settings page (S0.6) must still work with the new keys.
+**Acceptance**
+- Reader shows font size (4 options), theme (light/dark) and width (3 options) controls; current values selected.
+- Choosing an option changes the reader at once (CSS class/variable) and sends the PUT.
+- Saved values are applied on the next page load; the dark theme also applies on the library and Settings pages.
+- Failed load of settings falls back to defaults; failed save shows a message.
+- The 1000-paragraph CSS from S1.5 is not slowed (no per-paragraph bindings for appearance).
+- Unit tests (Vitest, generated client mocked): defaults applied, load applies saved values, each control sends the right PUT, failed save message, theme class on root.
+Verify: dev runs `npm test -- --watch=false` and `npm run build`; QA reads the code.
 
 ## S1.8 Multi-file book import — Story — TODO
 One upload of several `.txt` files, ordered by natural filename sort, merged into one book (D11). Postponed from S1.1.

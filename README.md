@@ -33,6 +33,13 @@ AI features need a local Ollama model. The model name is a setting (`ollama.mode
 ## Data folder
 All app data (database, settings, generated files) is stored in a `data` folder beside the executable. Under `dotnet run` this is `src/BookReader.Api/bin/Debug/net10.0/data`, so it is lost when the project is cleaned.
 
+## Tools
+### Convert PDF to TXT
+Convert a book-style PDF into a `.txt` file formatted for import (requires `pip install pypdf`):
+```bash
+python tools/pdf2txt.py book/hpmor-1.pdf
+```
+
 ## More
 - [api/README.md](api/README.md) - API contract
 - [web/README.md](web/README.md) - frontend

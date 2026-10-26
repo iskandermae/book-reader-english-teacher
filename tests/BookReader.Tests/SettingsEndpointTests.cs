@@ -43,6 +43,12 @@ public sealed class SettingsEndpointTests : ApiTestBase
         await AssertRejectedAsync(new Dictionary<string, string?> { ["ui.sample"] = null }, "must not be null");
     }
 
+    [Fact]
+    public async Task Put_with_bad_reader_value_returns_400_and_saves_nothing()
+    {
+        await AssertRejectedAsync(new Dictionary<string, string?> { ["reader.theme"] = "blue" }, "'reader.theme' must be one of");
+    }
+
     private async Task AssertRejectedAsync(Dictionary<string, string?> body, string expectedDetail)
     {
         await using var app = NewApp();

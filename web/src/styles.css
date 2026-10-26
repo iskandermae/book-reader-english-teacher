@@ -1,1 +1,5 @@
 /* You can add global styles to this file, and also import other style files */
+
+/* Dark theme is a class on <html> (set by AppearanceService) so it covers every page. */
+html.dark { color-scheme: dark; background: #121212; color: #e6e6e6; }
+html.dark a { color: #8ab4f8; }

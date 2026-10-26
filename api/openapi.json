@@ -521,7 +521,7 @@
         ],
         "summary": "Updates one or more settings. The request is all or nothing; returns all settings after the update.",
         "requestBody": {
-          "description": "Key/value map. Only known keys are accepted; values may be at most 1000 characters.",
+          "description": "Key/value map. Only known keys are accepted; values may be at most 1000 characters. reader.fontSize: small|medium|large|xlarge; reader.theme: light|dark; reader.width: narrow|medium|wide.",
           "content": {
             "application/json": {
               "schema": {

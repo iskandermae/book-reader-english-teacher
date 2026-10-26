@@ -10,7 +10,7 @@ public interface ISettingsService
     Task<IReadOnlyDictionary<string, string>> GetAllAsync(CancellationToken ct = default);
 
     /// <summary>Validates and saves the given values (all or nothing), then returns all settings.</summary>
-    /// <exception cref="SettingsValidationException">Unknown key, null value or value that is too long.</exception>
+    /// <exception cref="SettingsValidationException">Unknown key, null value or value that is too long, or a value outside the allowed set of a reader setting.</exception>
     Task<IReadOnlyDictionary<string, string>> UpdateAsync(IReadOnlyDictionary<string, string?> values, CancellationToken ct = default);
 }
 
@@ -19,6 +19,9 @@ public class SettingsService(AppDbContext db) : ISettingsService
     public const string OllamaModel = "ollama.model";
     public const string UiSample = "ui.sample";
     public const string ChapterRegex = "import.chapterRegex";
+    public const string ReaderFontSize = "reader.fontSize";
+    public const string ReaderTheme = "reader.theme";
+    public const string ReaderWidth = "reader.width";
     public const int MaxValueLength = 1000;
 
     // Known keys with their defaults. Adding a setting = adding a line here (no migration needed).
@@ -28,6 +31,17 @@ public class SettingsService(AppDbContext db) : ISettingsService
         [OllamaModel] = "",
         [UiSample] = "",
         [ChapterRegex] = BookParser.DefaultChapterRegex,
+        [ReaderFontSize] = "medium",
+        [ReaderTheme] = "light",
+        [ReaderWidth] = "medium",
+    };
+
+    // Keys that accept only a fixed set of values (an empty string is not allowed for them).
+    private static readonly IReadOnlyDictionary<string, string[]> AllowedValues = new Dictionary<string, string[]>
+    {
+        [ReaderFontSize] = ["small", "medium", "large", "xlarge"],
+        [ReaderTheme] = ["light", "dark"],
+        [ReaderWidth] = ["narrow", "medium", "wide"],
     };
 
     public async Task<IReadOnlyDictionary<string, string>> GetAllAsync(CancellationToken ct = default)
@@ -83,6 +97,8 @@ public class SettingsService(AppDbContext db) : ISettingsService
                 errors.Add($"Setting '{key}' must not be null.");
             else if (value.Length > MaxValueLength)
                 errors.Add($"Setting '{key}' is too long ({value.Length} characters, maximum is {MaxValueLength}).");
+            else if (AllowedValues.TryGetValue(key, out var allowed) && !allowed.Contains(value))
+                errors.Add($"Setting '{key}' must be one of: {string.Join(", ", allowed)}.");
             else if (key == ChapterRegex)
                 ValidateChapterRegex(value, errors);
         }

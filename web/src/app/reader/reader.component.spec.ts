@@ -3,6 +3,7 @@ import { provideRouter, Router } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { ReaderComponent } from './reader.component';
 import { Chapter, ReaderService } from './reader.service';
+import { SettingsService } from '../settings/settings.service';
 
 const chapters = [0, 1, 2].map((index) => ({ index, title: `Chapter ${index}` }));
 
@@ -28,6 +29,7 @@ class FakeObserver {
 describe('ReaderComponent', () => {
   type Mock = ReturnType<typeof vi.fn>;
   let api: { chapters: Mock; chapter: Mock; position: Mock; savePosition: Mock };
+  let settings: { load: Mock; save: Mock };
   const observer = () => FakeObserver.instances[FakeObserver.instances.length - 1];
 
   beforeEach(() => {
@@ -36,6 +38,7 @@ describe('ReaderComponent', () => {
     Element.prototype.scrollIntoView = vi.fn();
     FakeObserver.instances = [];
     vi.stubGlobal('IntersectionObserver', FakeObserver);
+    settings = { load: vi.fn().mockResolvedValue({}), save: vi.fn().mockResolvedValue({}) };
     api = {
       chapters: vi.fn().mockResolvedValue({ title: 'My Book', chapters }),
       position: vi.fn().mockResolvedValue({ chapterIndex: 0, paragraphIndex: 0 }),
@@ -47,6 +50,7 @@ describe('ReaderComponent', () => {
       providers: [
         provideRouter([{ path: 'books/:id', component: ReaderComponent }]),
         { provide: ReaderService, useValue: api },
+        { provide: SettingsService, useValue: settings },
       ],
     });
   });
@@ -150,6 +154,52 @@ describe('ReaderComponent', () => {
     const { el } = await open('/books/99');
     expect(el.querySelector('[role=alert]')!.textContent).toContain('Could not load');
     expect(el.querySelector('a')!.getAttribute('href')).toBe('/');
+  });
+
+  describe('appearance', () => {
+    const select = (el: HTMLElement, key: string) => el.querySelector<HTMLSelectElement>(`select[name="${key}"]`)!;
+    const choose = async (harness: RouterTestingHarness, key: string, value: string) => {
+      const s = select(harness.routeNativeElement as HTMLElement, key);
+      s.value = value;
+      s.dispatchEvent(new Event('change'));
+      await harness.fixture.whenStable();
+      harness.detectChanges();
+    };
+
+    it('shows the defaults as selected and on the article', async () => {
+      const { el } = await open('/books/5?chapter=0');
+      expect(select(el, 'reader.fontSize').value).toBe('medium');
+      expect(select(el, 'reader.theme').value).toBe('light');
+      expect(select(el, 'reader.width').value).toBe('medium');
+      expect(select(el, 'reader.fontSize').options.length).toBe(4);
+      expect(el.querySelector('article')!.getAttribute('data-font')).toBe('medium');
+    });
+
+    it.each([
+      ['reader.fontSize', 'xlarge', 'data-font'],
+      ['reader.width', 'wide', 'data-width'],
+    ])('%s change updates the article and sends the PUT', async (key, value, attr) => {
+      const { harness, el } = await open('/books/5?chapter=0');
+      await choose(harness, key, value);
+      expect(el.querySelector('article')!.getAttribute(attr)).toBe(value);
+      expect(settings.save).toHaveBeenCalledWith({ [key]: value });
+    });
+
+    it('theme change sends the PUT and sets the root class', async () => {
+      const { harness } = await open('/books/5?chapter=0');
+      await choose(harness, 'reader.theme', 'dark');
+      TestBed.tick();
+      expect(settings.save).toHaveBeenCalledWith({ 'reader.theme': 'dark' });
+      expect(document.documentElement.classList.contains('dark')).toBe(true);
+      document.documentElement.classList.remove('dark');
+    });
+
+    it('shows a message when saving fails', async () => {
+      settings.save.mockRejectedValue(new Error('offline'));
+      const { harness, el } = await open('/books/5?chapter=0');
+      await choose(harness, 'reader.width', 'narrow');
+      expect(el.querySelector('[role=alert]')!.textContent).toContain('Could not save');
+    });
   });
 
   describe('reading position', () => {
