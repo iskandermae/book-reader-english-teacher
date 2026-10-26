@@ -3,10 +3,10 @@
 Last updated: 2026-10-26
 
 ## Phase
-Epic 0 DONE. Epic 1 in progress: S1.1-S1.7b DONE, S1.8 and S1.8b DONE (QA approved). Epic 1 stories all DONE; epic closure pending the slow-test answer.
+Epic 0 and Epic 1 DONE. Epic 2 in progress: S2.1 DONE (QA approved after 1 fix round). S2.2-S2.7 TODO (need grooming).
 
 ## Next action
-Pick the next epic (Epic 2 AI text tools needs grooming). Slow perf test removed (decision: no committed performance tests; rule added to CLAUDE.md). Epic 1 can be closed. User manual checks done. Stop-hook sound changed to `tada.wav`. Only `README.md` is staged (not ours).
+Groom S2.2 (text selection toolbar, frontend only), then delegate to frontend-dev. Decisions: SSE format = `data: "<json string>"`, end `event: done`, error `event: error`; setting `ollama.url` (default localhost:11434).
 
 ## Commit checklist for the user (Epic 0)
 - Commit `web/package-lock.json`.

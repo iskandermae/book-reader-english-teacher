@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Logging;
 
 namespace BookReader.Tests;
 
@@ -10,7 +11,12 @@ public abstract class ApiTestBase : IDisposable
 
     /// <summary>Starts a new host on the same data folder; call it twice to simulate an app restart.</summary>
     protected WebApplicationFactory<Program> NewApp() =>
-        new WebApplicationFactory<Program>().WithWebHostBuilder(b => b.UseSetting("DataFolder", DataFolderPath));
+        new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
+        {
+            b.UseSetting("DataFolder", DataFolderPath);
+            // Tests only: drop host/EF Core info logs; real warnings and errors still show.
+            b.ConfigureLogging(l => l.SetMinimumLevel(LogLevel.Warning));
+        });
 
     public void Dispose()
     {

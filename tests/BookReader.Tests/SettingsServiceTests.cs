@@ -26,7 +26,8 @@ public sealed class SettingsServiceTests : IDisposable
     {
         var all = await _service.GetAllAsync();
 
-        Assert.Equal(6, all.Count);
+        Assert.Equal(7, all.Count);
+        Assert.Equal("http://localhost:11434", all[SettingsService.OllamaUrl]);
         Assert.Equal("medium", all[SettingsService.ReaderFontSize]);
         Assert.Equal("light", all[SettingsService.ReaderTheme]);
         Assert.Equal("medium", all[SettingsService.ReaderWidth]);

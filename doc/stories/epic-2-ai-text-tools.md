@@ -2,12 +2,16 @@
 
 Depends on: Epic 1. MVP is complete after S2.7.
 
-## S2.1 LLM provider abstraction with Ollama — Enabler — TODO
+## S2.1 LLM provider abstraction with Ollama — Enabler (backend only) — DONE
 **Acceptance**
-- `ILlmProvider` interface (streaming text generation) and an Ollama implementation using OllamaSharp.
-- Endpoints: list installed models, connection status check.
-- A test endpoint returns text from a local model.
-- Unit tests with a fake provider; the Ollama implementation is covered by an optional integration test.
+- `ILlmProvider` interface (streaming text generation, model list, availability check) and an Ollama implementation using OllamaSharp (D5, D6).
+- New setting `ollama.url`, default `http://localhost:11434`. The provider reads `ollama.url` and `ollama.model` from settings on each call (no restart needed).
+- `GET /api/llm/status`: returns `{ available, url, model, error? }`. Never throws when Ollama is down.
+- `GET /api/llm/models`: installed model names. Ollama down -> 503 with a clear message and hint ("Start Ollama...").
+- `POST /api/llm/test` `{ prompt }`: streams text as Server-Sent Events (this is the streaming format S2.3-S2.5 will reuse). Empty `ollama.model` -> 400 "Choose a model in settings". Ollama down -> 503 with hint.
+- `api/openapi.json` updated.
+- Unit tests with a fake provider (status, models, streaming, error mapping); no network, no Ollama. The Ollama implementation is covered by one optional integration test, excluded from the default run (category/trait).
+- Out of scope: frontend, model picker UI (S2.6), prompts (S2.3+), cloud providers.
 
 ## S2.2 Text selection toolbar — Story — TODO
 **Acceptance**

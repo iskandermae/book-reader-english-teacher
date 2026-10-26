@@ -151,6 +151,8 @@ public sealed class BookImportTests : IDisposable
 
     [Theory]
     [InlineData("2.txt", "10.txt")]
+    [InlineData("2.txt", "3.txt")]
+    [InlineData("1.txt", "2.txt")]
     [InlineData("ch2.txt", "ch10.txt")]
     [InlineData("CH2.txt", "ch10.txt")]
     [InlineData("a02.txt", "a10.txt")]

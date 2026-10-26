@@ -480,6 +480,155 @@
         }
       }
     },
+    "/api/llm/status": {
+      "get": {
+        "tags": [
+          "Llm"
+        ],
+        "summary": "Checks whether the LLM server (Ollama) is reachable. Always returns 200; a problem is reported in the error field.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlmStatus"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlmStatus"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlmStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/llm/models": {
+      "get": {
+        "tags": [
+          "Llm"
+        ],
+        "summary": "Lists the names of the installed models.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Ollama is not reachable; the detail field says how to fix it.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/llm/test": {
+      "post": {
+        "tags": [
+          "Llm"
+        ],
+        "summary": "Sends a prompt to the chosen model and streams the answer as Server-Sent Events.\r\nEach chunk is an event with a JSON string as data (for example `data: \"Hello\"`); the stream ends with `event: done`.\r\nIf the model fails after the stream started, an `event: error` with the message as data is sent instead.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LlmTestRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LlmTestRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/LlmTestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Blank prompt, no model chosen in settings, or the chosen model is not installed.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Ollama is not reachable; the detail field says how to fix it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/settings": {
       "get": {
         "tags": [
@@ -812,6 +961,45 @@
         },
         "description": "The imported book."
       },
+      "LlmStatus": {
+        "required": [
+          "available",
+          "url",
+          "model",
+          "error"
+        ],
+        "type": "object",
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "url": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "error": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "LlmTestRequest": {
+        "required": [
+          "prompt"
+        ],
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "The text sent to the model."
+          }
+        },
+        "description": "Request of the LLM test endpoint."
+      },
       "ProblemDetails": {
         "type": "object",
         "properties": {
@@ -886,6 +1074,9 @@
     },
     {
       "name": "Health"
+    },
+    {
+      "name": "Llm"
     },
     {
       "name": "Settings"

@@ -17,6 +17,7 @@ public interface ISettingsService
 public class SettingsService(AppDbContext db) : ISettingsService
 {
     public const string OllamaModel = "ollama.model";
+    public const string OllamaUrl = "ollama.url";
     public const string UiSample = "ui.sample";
     public const string ChapterRegex = "import.chapterRegex";
     public const string ReaderFontSize = "reader.fontSize";
@@ -29,6 +30,7 @@ public class SettingsService(AppDbContext db) : ISettingsService
     private static readonly IReadOnlyDictionary<string, string> Defaults = new Dictionary<string, string>
     {
         [OllamaModel] = "",
+        [OllamaUrl] = "http://localhost:11434",
         [UiSample] = "",
         [ChapterRegex] = BookParser.DefaultChapterRegex,
         [ReaderFontSize] = "medium",
@@ -101,10 +103,15 @@ public class SettingsService(AppDbContext db) : ISettingsService
                 errors.Add($"Setting '{key}' must be one of: {string.Join(", ", allowed)}.");
             else if (key == ChapterRegex)
                 ValidateChapterRegex(value, errors);
+            else if (key == OllamaUrl && !IsHttpUrl(value))
+                errors.Add($"Setting '{OllamaUrl}' must be an http or https address, for example http://localhost:11434.");
         }
         if (errors.Count > 0)
             throw new SettingsValidationException(string.Join(" ", errors));
     }
+
+    private static bool IsHttpUrl(string value) =>
+        Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https";
 
     // Reject a broken pattern when it is saved, so the user sees the problem in settings and not only at the next import.
     private static void ValidateChapterRegex(string pattern, List<string> errors)
