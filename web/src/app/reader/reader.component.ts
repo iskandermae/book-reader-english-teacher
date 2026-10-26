@@ -3,6 +3,8 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
 import { APPEARANCE_OPTIONS, AppearanceKey, AppearanceService } from '../appearance/appearance.service';
+import { AiPanelComponent } from './ai-panel.component';
+import { LlmService } from './llm.service';
 import { captureSelection, TextSelection } from './capture-selection';
 import { SelectionToolbarComponent } from './selection-toolbar.component';
 import { BookChapters, Chapter, ReaderService, ReadingPosition } from './reader.service';
@@ -12,7 +14,7 @@ const SELECTION_DELAY_MS = 150;
 
 @Component({
   selector: 'app-reader',
-  imports: [RouterLink, SelectionToolbarComponent],
+  imports: [RouterLink, SelectionToolbarComponent, AiPanelComponent],
   styles: `
     .layout { display: flex; gap: 1rem; align-items: flex-start; }
     nav { min-width: 14rem; max-width: 18rem; }
@@ -79,7 +81,11 @@ const SELECTION_DELAY_MS = 150;
         </article>
       </div>
       @if (selection(); as current) {
-        <app-selection-toolbar [selection]="current.selection" [anchor]="current.anchor" />
+        <app-selection-toolbar [selection]="current.selection" [anchor]="current.anchor" (translate)="translate($event)" />
+      }
+      @if (aiPanel(); as panel) {
+        <app-ai-panel [title]="panel.title" [text]="panel.text" [error]="panel.error" [loading]="panel.loading"
+                      (closed)="closeAiPanel()" />
       }
     }
   `,
@@ -88,6 +94,7 @@ export class ReaderComponent {
   private readonly api = inject(ReaderService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly llm = inject(LlmService);
 
   protected readonly appearance = inject(AppearanceService);
   protected readonly controls = [
@@ -122,6 +129,10 @@ export class ReaderComponent {
   protected readonly selection = signal<{ selection: TextSelection; anchor: DOMRect } | null>(null);
   private selectionTimer: ReturnType<typeof setTimeout> | undefined;
 
+  // The AI result panel; null when closed. Only one request runs at a time.
+  protected readonly aiPanel = signal<{ title: string; text: string; error: string; loading: boolean } | null>(null);
+  private aiRequest: AbortController | null = null;
+
   // Guards against a slow earlier response overwriting a newer one.
   private loadToken = 0;
   private loadedBookId: number | null = null;
@@ -145,6 +156,7 @@ export class ReaderComponent {
     inject(DestroyRef).onDestroy(() => {
       document.removeEventListener('selectionchange', onSelectionChange);
       clearTimeout(this.selectionTimer);
+      this.aiRequest?.abort();
       // Invalidate any in-flight load so it cannot save or start observing after destroy.
       this.loadToken++;
       this.stopObserving();
@@ -158,6 +170,29 @@ export class ReaderComponent {
 
   protected open(index: number): void {
     void this.router.navigate([], { queryParams: { chapter: index }, queryParamsHandling: 'merge' });
+  }
+
+  protected async translate({ text, context }: TextSelection): Promise<void> {
+    this.aiRequest?.abort(); // a new request replaces the running one
+    const request = (this.aiRequest = new AbortController());
+    this.aiPanel.set({ title: 'Translation', text: '', error: '', loading: true });
+    try {
+      for await (const chunk of this.llm.translate(text, context, request.signal)) {
+        this.aiPanel.update((p) => p && { ...p, text: p.text + chunk, loading: false });
+      }
+    } catch (e) {
+      if (!request.signal.aborted) {
+        this.aiPanel.update((p) => p && { ...p, error: e instanceof Error ? e.message : 'The AI request failed.' });
+      }
+    } finally {
+      if (this.aiRequest === request) this.aiPanel.update((p) => p && { ...p, loading: false });
+    }
+  }
+
+  protected closeAiPanel(): void {
+    this.aiRequest?.abort();
+    this.aiRequest = null;
+    this.aiPanel.set(null);
   }
 
   private updateSelection(): void {

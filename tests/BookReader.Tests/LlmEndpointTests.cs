@@ -138,6 +138,69 @@ public sealed class LlmEndpointTests : ApiTestBase
             HttpStatusCode.BadRequest, "Prompt must not be empty.");
     }
 
+    [Fact]
+    public async Task Translate_streams_translation_with_default_ukrainian_prompt()
+    {
+        _llm.Chunks = ["Hi-uk"];
+        await using var app = NewAppWithFakeLlm();
+        using var client = app.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/llm/translate", new TranslateRequest("Hello", "Hello, world."));
+
+        Assert.Equal("text/event-stream", response.Content.Headers.ContentType!.MediaType);
+        Assert.Equal("data: \"Hi-uk\"\n\nevent: done\ndata: \n\n", await response.Content.ReadAsStringAsync());
+        Assert.Contains("into Ukrainian", _llm.LastPrompt);
+        Assert.Contains("Hello", _llm.LastPrompt);
+        Assert.DoesNotContain("Hello, world.", _llm.LastPrompt);
+    }
+
+    [Fact]
+    public async Task Translate_reads_target_language_from_settings_on_each_call()
+    {
+        await using var app = NewAppWithFakeLlm();
+        using var client = app.CreateClient();
+        await client.PutAsJsonAsync("/api/settings", new Dictionary<string, string> { ["language.native"] = "German" });
+
+        await client.PostAsJsonAsync("/api/llm/translate", new TranslateRequest("Hello"));
+
+        Assert.Contains("into German", _llm.LastPrompt);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task Translate_returns_400_for_blank_text(string text)
+    {
+        await AssertProblemAsync(c => c.PostAsJsonAsync("/api/llm/translate", new TranslateRequest(text)),
+            HttpStatusCode.BadRequest, "Text must not be empty.");
+    }
+
+    [Fact]
+    public async Task Translate_returns_400_when_no_model_is_chosen()
+    {
+        _llm.Failure = new LlmNotConfiguredException("Choose a model in settings.");
+        await AssertProblemAsync(c => c.PostAsJsonAsync("/api/llm/translate", new TranslateRequest("Hello")),
+            HttpStatusCode.BadRequest, "Choose a model in settings.");
+    }
+
+    [Fact]
+    public async Task Translate_returns_503_with_hint_when_ollama_is_down()
+    {
+        _llm.Failure = new LlmUnavailableException("Start Ollama.");
+        await AssertProblemAsync(c => c.PostAsJsonAsync("/api/llm/translate", new TranslateRequest("Hello")),
+            HttpStatusCode.ServiceUnavailable, "Start Ollama.");
+    }
+
+    [Fact]
+    public async Task Translate_returns_400_when_native_language_is_blank()
+    {
+        await AssertProblemAsync(async c =>
+        {
+            await c.PutAsJsonAsync("/api/settings", new Dictionary<string, string> { ["language.native"] = " " });
+            return await c.PostAsJsonAsync("/api/llm/translate", new TranslateRequest("Hello"));
+        }, HttpStatusCode.BadRequest, "Set your native language in settings.");
+    }
+
     private async Task AssertProblemAsync(Func<HttpClient, Task<HttpResponseMessage>> call, HttpStatusCode status, string detail)
     {
         await using var app = NewAppWithFakeLlm();

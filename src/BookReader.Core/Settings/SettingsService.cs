@@ -18,6 +18,7 @@ public class SettingsService(AppDbContext db) : ISettingsService
 {
     public const string OllamaModel = "ollama.model";
     public const string OllamaUrl = "ollama.url";
+    public const string LanguageNative = "language.native";
     public const string UiSample = "ui.sample";
     public const string ChapterRegex = "import.chapterRegex";
     public const string ReaderFontSize = "reader.fontSize";
@@ -31,6 +32,7 @@ public class SettingsService(AppDbContext db) : ISettingsService
     {
         [OllamaModel] = "",
         [OllamaUrl] = "http://localhost:11434",
+        [LanguageNative] = "Ukrainian",
         [UiSample] = "",
         [ChapterRegex] = BookParser.DefaultChapterRegex,
         [ReaderFontSize] = "medium",

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using BookReader.Api.Filters;
 using BookReader.Core.Llm;
+using BookReader.Core.Settings;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BookReader.Api.Controllers;
@@ -8,7 +9,7 @@ namespace BookReader.Api.Controllers;
 [ApiController]
 [Route("api/llm")]
 [ServiceFilter<LlmExceptionFilter>]
-public class LlmController(ILlmProvider llm) : ControllerBase
+public class LlmController(ILlmProvider llm, ISettingsService settings) : ControllerBase
 {
     /// <summary>Checks whether the LLM server (Ollama) is reachable. Always returns 200; a problem is reported in the error field.</summary>
     [HttpGet("status")]
@@ -39,7 +40,34 @@ public class LlmController(ILlmProvider llm) : ControllerBase
         if (string.IsNullOrWhiteSpace(request.Prompt))
             return BadRequest(new ProblemDetails { Title = "Invalid prompt", Detail = "Prompt must not be empty." });
 
-        await using var chunks = llm.GenerateAsync(request.Prompt, ct).GetAsyncEnumerator(ct);
+        return await StreamAsync(request.Prompt, ct);
+    }
+
+    /// <summary>
+    /// Translates the selected text into the native language (setting <c>language.native</c>, Ukrainian by default) and streams the translation.
+    /// The stream format is the same as in the test endpoint. Only <c>text</c> is translated; <c>context</c> is not used yet (kept for custom prompts).
+    /// </summary>
+    /// <response code="400">Blank text, no model chosen in settings, or the chosen model is not installed.</response>
+    /// <response code="503">Ollama is not reachable; the detail field says how to fix it.</response>
+    [HttpPost("translate")]
+    [ProducesResponseType<string>(StatusCodes.Status200OK, "text/event-stream")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status503ServiceUnavailable, "application/problem+json")]
+    public async Task<IActionResult> Translate([FromBody] TranslateRequest request, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.Text))
+            return BadRequest(new ProblemDetails { Title = "Invalid text", Detail = "Text must not be empty." });
+
+        var language = (await settings.GetAllAsync(ct))[SettingsService.LanguageNative];
+        if (string.IsNullOrWhiteSpace(language))
+            throw new LlmNotConfiguredException("Set your native language in settings.");
+
+        return await StreamAsync(TranslatePrompt.Build(request.Text, language.Trim()), ct);
+    }
+
+    private async Task<IActionResult> StreamAsync(string prompt, CancellationToken ct)
+    {
+        await using var chunks = llm.GenerateAsync(prompt, ct).GetAsyncEnumerator(ct);
         // The first MoveNext runs before the response starts, so setup errors still become a clean 400/503 (see LlmExceptionFilter).
         var hasNext = await chunks.MoveNextAsync();
 
@@ -74,3 +102,8 @@ public class LlmController(ILlmProvider llm) : ControllerBase
 /// <summary>Request of the LLM test endpoint.</summary>
 /// <param name="Prompt">The text sent to the model.</param>
 public record LlmTestRequest(string Prompt);
+
+/// <summary>Request of the translate endpoint.</summary>
+/// <param name="Text">The selected text to translate. Required.</param>
+/// <param name="Context">The sentence(s) around the selection. Accepted but not used by the translate prompt yet.</param>
+public record TranslateRequest(string Text, string? Context = null);

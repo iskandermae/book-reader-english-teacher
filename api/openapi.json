@@ -689,6 +689,66 @@
         }
       }
     },
+    "/api/llm/translate": {
+      "post": {
+        "tags": [
+          "Llm"
+        ],
+        "summary": "Translates the selected text into the native language (setting `language.native`, Ukrainian by default) and streams the translation.\r\nThe stream format is the same as in the test endpoint. Only `text` is translated; `context` is not used yet (kept for custom prompts).",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TranslateRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TranslateRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/TranslateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Blank text, no model chosen in settings, or the chosen model is not installed.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Ollama is not reachable; the detail field says how to fix it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/settings": {
       "get": {
         "tags": [
@@ -1141,6 +1201,26 @@
           }
         },
         "description": "File names to put in natural order."
+      },
+      "TranslateRequest": {
+        "required": [
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "The selected text to translate. Required."
+          },
+          "context": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The sentence(s) around the selection. Accepted but not used by the translate prompt yet."
+          }
+        },
+        "description": "Request of the translate endpoint."
       }
     }
   },

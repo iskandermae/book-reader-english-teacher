@@ -27,11 +27,17 @@ Depends on: Epic 1. MVP is complete after S2.7.
 - Out of scope: actions/buttons, API calls, touch-specific handles, highlighting saved selections.
 - Assumption: no buttons yet, so the user verifies by selecting text and seeing the preview.
 
-## S2.3 Translate selection — Story — TODO
+## S2.3 Translate selection — Story
 **Acceptance**
-- "Translate" sends selection + context to the backend; the result streams into a side panel.
-- Target language comes from settings (see S2.6; a default is used before that).
-- If Ollama is unavailable, a clear error with a hint is shown.
+- Backend: `POST /api/llm/translate` `{ text, context }` streams SSE (same format as `/api/llm/test`). The prompt translates the selected `text` only into the target language. `context` is accepted (and may be passed to the model as a meaning hint only if that does not change the output scope); it is kept in the API for S2.6 custom prompts.
+- New setting `language.native`, default `Ukrainian`. It is the target language, read on each call. No UI for it until S2.6.
+- Prompt building is a pure, unit-tested function (selection, target language -> prompt). The model output is the translation only (no preface).
+- Errors: empty `text` -> 400; empty `ollama.model` -> 400 "Choose a model in settings"; Ollama down -> 503 with hint (same mapping as S2.1).
+- `api/openapi.json` updated. Unit tests with the fake provider (streaming, prompt content, error mapping); no network.
+- Frontend: a "Translate" button in the selection toolbar opens a right side panel; the translation streams into it. The panel is reusable by S2.4/S2.5 (title + streamed text + error area + close button). Closing the panel or starting a new request cancels the running one.
+- Error from the backend (e.g. Ollama down) is shown in the panel with its hint.
+- Frontend tests: panel shows streamed chunks, shows an error, cancels on close (service mocked).
+- Out of scope: settings UI (S2.6), caching (S2.7), context/sentence/paragraph placeholders (S2.6).
 
 ## S2.4 Explain selection — Story — TODO
 **Acceptance**
@@ -48,6 +54,7 @@ Depends on: Epic 1. MVP is complete after S2.7.
 - Settings for 1-20 more dynamic actions - the same implementation as "Simplify selection" but according to user's settings
 - Example: Explain selection, Rewrite selection in B2 english, and so on
 - User create setting with: name, prompt template (with {selection}, {from_language}, {target_language} substrings, where selected text|languages are inserted)
+- Also offer {sentence} (context sentence) and {paragraph} placeholders (decided in S2.3 grooming: translate uses the selection only).
 - The program prepares the prompt, executes it and put the result to the resulting text box  
 - Settings for native language, English level, Ollama URL and model (chosen from the installed list).
 - Prompts for S2.3-S2.5 use these settings.

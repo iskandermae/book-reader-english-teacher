@@ -1,10 +1,10 @@
-import { afterRenderEffect, Component, computed, ElementRef, inject, input, signal } from '@angular/core';
+import { afterRenderEffect, Component, computed, ElementRef, inject, input, output, signal } from '@angular/core';
 import { TextSelection } from './capture-selection';
 
 const GAP_PX = 8;
 const PREVIEW_CHARS = 60;
 
-/** Floating toolbar over the selected text. Action buttons are added by later stories; for now it previews the text. */
+/** Floating toolbar over the selected text. Shows a preview of the text and the action buttons. */
 @Component({
   selector: 'app-selection-toolbar',
   host: {
@@ -19,10 +19,14 @@ const PREVIEW_CHARS = 60;
     :host { position: absolute; z-index: 10; padding: 0.25rem 0.5rem; background: Canvas; color: CanvasText;
             border: 1px solid GrayText; border-radius: 0.25rem; box-shadow: 0 2px 6px rgb(0 0 0 / 0.3); }
   `,
-  template: `<span class="preview">{{ preview() }}</span>`,
+  template: `
+    <span class="preview">{{ preview() }}</span>
+    <button type="button" (click)="translate.emit(selection())">Translate</button>
+  `,
 })
 export class SelectionToolbarComponent {
   readonly selection = input.required<TextSelection>();
+  readonly translate = output<TextSelection>();
   /** Viewport rectangle of the selection. */
   readonly anchor = input.required<DOMRect>();
 
