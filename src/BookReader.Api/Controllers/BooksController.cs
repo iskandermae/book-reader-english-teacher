@@ -52,6 +52,10 @@ public record ChapterResponse(int BookId, int Index, string Title, List<string> 
 /// <param name="ParagraphIndex">Paragraph index inside the chapter (array position in the chapter response).</param>
 public record ReadingPositionDto(int ChapterIndex, int ParagraphIndex);
 
+/// <summary>File names to put in natural order.</summary>
+/// <param name="Names">The names, in any order.</param>
+public record SortNamesRequest(List<string> Names);
+
 [ApiController]
 [Route("api/books")]
 [ServiceFilter<BookImportExceptionFilter>]
@@ -146,6 +150,15 @@ public class BooksController(IBookImportService importService, IBookLibraryServi
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(int id, CancellationToken ct) =>
         await library.DeleteAsync(id, ct) ? NoContent() : NotFound();
+
+    // Keep the "request" param doc last: the OpenAPI generator uses the last param doc as the request body description.
+    /// <summary>Sorts file names in the order the import merges them (natural order: ch2 before ch10, case-insensitive). Pure function: no files, no database.</summary>
+    /// <param name="request">The names to sort.</param>
+    /// <response code="200">The same names in natural order.</response>
+    [HttpPost("sort-names")]
+    [ProducesResponseType<List<string>>(StatusCodes.Status200OK)]
+    public List<string> SortNames(SortNamesRequest request) =>
+        request.Names.Order(NaturalFileNameComparer.Instance).ToList();
 
     // Keep the "request" param doc last: the OpenAPI generator uses the last param doc as the request body description.
     /// <summary>Imports a book from one or more .txt files (merged in natural file-name order): splits it into chapters and paragraphs and stores it.</summary>

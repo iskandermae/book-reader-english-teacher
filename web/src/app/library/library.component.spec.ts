@@ -72,12 +72,14 @@ describe('LibraryComponent', () => {
     expect(el.querySelector<HTMLInputElement>('input[name=title]')!.value).toBe('My Book.v2');
   });
 
-  it('lists several files in natural order, prefills the title from the first and sends all', async () => {
+  it('lists several files in the order returned by the server, prefills the title from the first and sends all', async () => {
     const importFn = vi.fn().mockResolvedValue(undefined);
-    const { fixture, el } = await render({ list: () => Promise.resolve([]), import: importFn });
+    const sortNames = vi.fn().mockResolvedValue(['Ch1.txt', 'ch2.txt', 'ch10.txt']);
+    const { fixture, el } = await render({ list: () => Promise.resolve([]), import: importFn, sortNames });
     const [ch10, ch2, ch1] = choose(el, 'ch10.txt', 'ch2.txt', 'Ch1.txt');
     await settle(fixture);
 
+    expect(sortNames).toHaveBeenCalledWith(['ch10.txt', 'ch2.txt', 'Ch1.txt']);
     const names = Array.from(el.querySelectorAll('ol[aria-label="Selected files"] li')).map((li) => li.textContent);
     expect(names).toEqual(['Ch1.txt', 'ch2.txt', 'ch10.txt']);
     expect(el.querySelector<HTMLInputElement>('input[name=title]')!.value).toBe('Ch1');
@@ -85,6 +87,86 @@ describe('LibraryComponent', () => {
     button(el, 'Import').click();
     await settle(fixture);
     expect(importFn).toHaveBeenCalledWith([ch1, ch2, ch10], 'Ch1');
+  });
+
+  it('keeps the picked order and shows an error when sorting fails, and upload still works', async () => {
+    const importFn = vi.fn().mockResolvedValue(undefined);
+    const { fixture, el } = await render({
+      list: () => Promise.resolve([]),
+      import: importFn,
+      sortNames: () => Promise.reject(new Error('down')),
+    });
+    const [b, a] = choose(el, 'b.txt', 'a.txt');
+    await settle(fixture);
+
+    const names = Array.from(el.querySelectorAll('ol[aria-label="Selected files"] li')).map((li) => li.textContent);
+    expect(names).toEqual(['b.txt', 'a.txt']);
+    expect(el.querySelector('form [role=alert]')!.textContent).toContain('Could not sort');
+
+    button(el, 'Import').click();
+    await settle(fixture);
+    expect(importFn).toHaveBeenCalledWith([b, a], 'b');
+  });
+
+  it('does not call the sort endpoint for a single file', async () => {
+    const sortNames = vi.fn();
+    const { fixture, el } = await render({ list: () => Promise.resolve([]), sortNames });
+    choose(el, 'a.txt');
+    await settle(fixture);
+    expect(sortNames).not.toHaveBeenCalled();
+  });
+
+  describe('late sort answers', () => {
+    async function pickTwice(second: string[], sortNames: () => Promise<string[]>) {
+      const { fixture, el } = await render({ list: () => Promise.resolve([]), sortNames });
+      choose(el, 'b.txt', 'a.txt');
+      choose(el, ...second);
+      await settle(fixture);
+      return { fixture, el };
+    }
+    const listed = (el: HTMLElement) =>
+      Array.from(el.querySelectorAll('ol[aria-label="Selected files"] li')).map((li) => li.textContent);
+
+    it('ignores a stale success answer', async () => {
+      let answer!: (n: string[]) => void;
+      const calls: Promise<string[]>[] = [];
+      const { fixture, el } = await pickTwice(['y.txt', 'x.txt'], () => {
+        const p = new Promise<string[]>((r) => !calls.length && (answer = r));
+        calls.push(p);
+        return calls.length === 1 ? p : new Promise<string[]>(() => {});
+      });
+      answer(['a.txt', 'b.txt']);
+      await settle(fixture);
+      expect(listed(el)).toEqual(['y.txt', 'x.txt']);
+    });
+
+    it('ignores a stale failure', async () => {
+      let fail!: (e: Error) => void;
+      let n = 0;
+      const { fixture, el } = await pickTwice(['y.txt', 'x.txt'], () =>
+        ++n === 1 ? new Promise<string[]>((_, rej) => (fail = rej)) : new Promise<string[]>(() => {}),
+      );
+      fail(new Error('down'));
+      await settle(fixture);
+      expect(el.querySelector('form [role=alert]')).toBeNull();
+    });
+  });
+
+  it('keeps a title the user edited while sorting', async () => {
+    let answer!: (n: string[]) => void;
+    const { fixture, el } = await render({
+      list: () => Promise.resolve([]),
+      sortNames: () => new Promise<string[]>((r) => (answer = r)),
+    });
+    choose(el, 'b.txt', 'a.txt');
+    await settle(fixture);
+    const input = el.querySelector<HTMLInputElement>('input[name=title]')!;
+    input.value = 'My title';
+    input.dispatchEvent(new Event('input'));
+
+    answer(['a.txt', 'b.txt']);
+    await settle(fixture);
+    expect(input.value).toBe('My title');
   });
 
   it('imports, refreshes the list and resets the form', async () => {

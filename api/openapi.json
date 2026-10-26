@@ -450,6 +450,66 @@
         }
       }
     },
+    "/api/books/sort-names": {
+      "post": {
+        "tags": [
+          "Books"
+        ],
+        "summary": "Sorts file names in the order the import merges them (natural order: ch2 before ch10, case-insensitive). Pure function: no files, no database.",
+        "requestBody": {
+          "description": "The names to sort.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SortNamesRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SortNamesRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/SortNamesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The same names in natural order.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/health": {
       "get": {
         "tags": [
@@ -1065,6 +1125,22 @@
           }
         },
         "description": "Where the reader stopped in a book. Both values are zero-based."
+      },
+      "SortNamesRequest": {
+        "required": [
+          "names"
+        ],
+        "type": "object",
+        "properties": {
+          "names": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The names, in any order."
+          }
+        },
+        "description": "File names to put in natural order."
       }
     }
   },

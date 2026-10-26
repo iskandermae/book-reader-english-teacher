@@ -6,7 +6,7 @@ Last updated: 2026-10-26
 Epic 0 and Epic 1 DONE. Epic 2 in progress: S2.1 DONE (QA approved after 1 fix round). S2.2-S2.7 TODO (need grooming).
 
 ## Next action
-Groom S2.2 (text selection toolbar, frontend only), then delegate to frontend-dev. Decisions: SSE format = `data: "<json string>"`, end `event: done`, error `event: error`; setting `ollama.url` (default localhost:11434).
+S1.9/S1.9b DONE (QA approved, minors fixed). Groom S2.2 (text selection toolbar, frontend only), then frontend-dev.
 
 ## Commit checklist for the user (Epic 0)
 - Commit `web/package-lock.json`.

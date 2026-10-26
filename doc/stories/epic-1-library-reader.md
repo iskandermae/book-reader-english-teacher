@@ -128,3 +128,14 @@ Decisions: the file input in the library form accepts several files; no manual r
 - Upload sends all files; success refreshes the list and resets the form. A 400 shows the server message (with the file name).
 - Unit tests (Vitest, client mocked): several files listed in order, title prefill from the first, upload sends all files, error message shown.
 Verify: dev runs `npm test -- --watch=false` and `npm run build`; QA reads the code.
+
+## S1.9 Single natural sort on the backend — Enabler — DONE (S1.9 backend, S1.9b frontend)
+Decision: remove the duplicated sort in `web/src/app/library/natural-sort.ts`; the UI asks the backend (extra API call).
+**Acceptance S1.9 (backend)**
+- `POST /api/books/sort-names` with `{ names: string[] }` returns the names in `NaturalFileNameComparer` order (`string[]`). Empty list -> empty list. No file access, no DB.
+- `api/openapi.json` updated; unit/endpoint tests (ch2 before ch10, case-insensitive, empty list).
+**Acceptance S1.9b (frontend)**
+- After picking files, the component calls the endpoint and lists the files in the returned order; title prefills from the first sorted name (still editable). Upload sends the files in that order.
+- `natural-sort.ts` and `natural-sort.spec.ts` are deleted; no client-side sorting remains.
+- If the call fails, show an error and keep the picked order (upload still works; the server sorts anyway).
+- Vitest tests (client mocked): list order from the response, title prefill, failure fallback.

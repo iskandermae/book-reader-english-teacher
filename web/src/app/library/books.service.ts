@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { deleteApiBooksById, getApiBooks, postApiBooks } from '../api';
+import { deleteApiBooksById, getApiBooks, postApiBooks, postApiBooksSortNames } from '../api';
 
 export interface BookSummary {
   id: number;
@@ -25,6 +25,12 @@ export class BooksService {
     if (!response?.ok) {
       throw new Error(error?.detail ?? 'Could not import the book.');
     }
+  }
+
+  /** Returns the names in natural order; the server owns this rule so the UI never re-implements it. */
+  async sortNames(names: string[]): Promise<string[]> {
+    const { data } = await postApiBooksSortNames({ body: { names }, throwOnError: true });
+    return data;
   }
 
   async delete(id: number): Promise<void> {

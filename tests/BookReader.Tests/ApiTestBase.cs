@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.Extensions.Logging;
 
 namespace BookReader.Tests;
 
@@ -15,7 +14,8 @@ public abstract class ApiTestBase : IDisposable
         {
             b.UseSetting("DataFolder", DataFolderPath);
             // Tests only: drop host/EF Core info logs; real warnings and errors still show.
-            b.ConfigureLogging(l => l.SetMinimumLevel(LogLevel.Warning));
+            // Must be config, not SetMinimumLevel: appsettings.json's Logging:LogLevel:Default filter rule overrides it.
+            b.UseSetting("Logging:LogLevel:Default", "Warning");
         });
 
     public void Dispose()

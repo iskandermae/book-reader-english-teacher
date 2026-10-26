@@ -2,7 +2,6 @@ import { DatePipe } from '@angular/common';
 import { Component, ElementRef, inject, OnInit, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { compareNatural } from './natural-sort';
 import { BookSummary, BooksService } from './books.service';
 
 @Component({
@@ -20,6 +19,9 @@ import { BookSummary, BooksService } from './books.service';
             <li>{{ f.name }}</li>
           }
         </ol>
+      }
+      @if (sortError()) {
+        <p role="alert">{{ sortError() }}</p>
       }
       <p><label>Title <input name="title" [(ngModel)]="title" /></label></p>
       <button type="submit" [disabled]="files().length === 0 || uploading()">Import</button>
@@ -62,10 +64,11 @@ export class LibraryComponent implements OnInit {
   protected readonly books = signal<BookSummary[]>([]);
   protected readonly loading = signal(true);
   protected readonly loadError = signal('');
-  // Selected files in natural name order (the order the server merges them in).
+  // Selected files, in the order returned by the server's natural sort (the order it merges them in).
   protected readonly files = signal<File[]>([]);
   private readonly picker = viewChild.required<ElementRef<HTMLInputElement>>('picker');
   protected title = '';
+  protected readonly sortError = signal('');
   protected readonly uploading = signal(false);
   protected readonly importError = signal('');
   protected readonly confirmingId = signal<number | null>(null);
@@ -75,13 +78,35 @@ export class LibraryComponent implements OnInit {
     return this.refresh();
   }
 
-  protected pick(event: Event): void {
-    const files = Array.from((event.target as HTMLInputElement).files ?? []).sort((a, b) =>
-      compareNatural(a.name, b.name),
-    );
+  protected async pick(event: Event): Promise<void> {
+    const picked = Array.from((event.target as HTMLInputElement).files ?? []);
+    this.sortError.set('');
+    this.setFiles(picked);
+    if (picked.length < 2) {
+      return;
+    }
+    const prefill = this.title;
+    try {
+      const sortedNames = await this.booksApi.sortNames(picked.map((f) => f.name));
+      // Ignore a late answer if the user has picked other files meanwhile.
+      if (this.files() === picked) {
+        // Re-prefill only if the user has not edited the title in the meantime.
+        this.setFiles(orderByNames(picked, sortedNames), this.title === prefill);
+      }
+    } catch {
+      if (this.files() === picked) {
+        // Keep the picked order: the server sorts on import anyway.
+        this.sortError.set('Could not sort the files; the server will sort them on import.');
+      }
+    }
+  }
+
+  private setFiles(files: File[], updateTitle = true): void {
     this.files.set(files);
-    // Prefill the title from the first file name without its extension; the user can still edit it.
-    this.title = files.length ? files[0].name.replace(/\.[^.]*$/, '') : '';
+    if (updateTitle) {
+      // Prefill the title from the first file name without its extension; the user can still edit it.
+      this.title = files.length ? files[0].name.replace(/\.[^.]*$/, '') : '';
+    }
   }
 
   protected async upload(): Promise<void> {
@@ -95,6 +120,7 @@ export class LibraryComponent implements OnInit {
       await this.booksApi.import(files, this.title);
       this.files.set([]);
       this.title = '';
+      this.sortError.set('');
       this.resetFileInput();
       await this.refresh();
     } catch (e) {
@@ -131,4 +157,14 @@ export class LibraryComponent implements OnInit {
   private resetFileInput(): void {
     this.picker().nativeElement.value = '';
   }
+}
+
+/** Reorders files to follow `names`; a file whose name is missing from the answer is kept at the end. */
+function orderByNames(files: File[], names: string[]): File[] {
+  const rest = [...files];
+  const ordered = names.flatMap((name) => {
+    const i = rest.findIndex((f) => f.name === name);
+    return i < 0 ? [] : rest.splice(i, 1);
+  });
+  return [...ordered, ...rest];
 }

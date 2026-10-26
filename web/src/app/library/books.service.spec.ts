@@ -47,4 +47,9 @@ describe('BooksService', () => {
     respond(404);
     await expect(service().delete(1)).rejects.toThrow('Could not delete the book.');
   });
+
+  it('returns the names sorted by the server', async () => {
+    respond(200, ['ch2.txt', 'ch10.txt']);
+    await expect(service().sortNames(['ch10.txt', 'ch2.txt'])).resolves.toEqual(['ch2.txt', 'ch10.txt']);
+  });
 });
