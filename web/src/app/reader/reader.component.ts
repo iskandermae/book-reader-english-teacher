@@ -3,10 +3,8 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
 import { APPEARANCE_OPTIONS, AppearanceKey, AppearanceService } from '../appearance/appearance.service';
-import { AiPanelComponent } from './ai-panel.component';
-import { LlmService } from './llm.service';
 import { captureSelection, TextSelection } from './capture-selection';
-import { SelectionToolbarComponent } from './selection-toolbar.component';
+import { WorkspaceComponent } from './workspace.component';
 import { BookChapters, Chapter, ReaderService, ReadingPosition } from './reader.service';
 
 const SAVE_DELAY_MS = 1000;
@@ -14,12 +12,12 @@ const SELECTION_DELAY_MS = 150;
 
 @Component({
   selector: 'app-reader',
-  imports: [RouterLink, SelectionToolbarComponent, AiPanelComponent],
+  imports: [RouterLink, WorkspaceComponent],
   styles: `
     .layout { display: flex; gap: 1rem; align-items: flex-start; }
     nav { min-width: 14rem; max-width: 18rem; }
     nav button.current { font-weight: bold; }
-    article { flex: 1; margin: 0 auto; font-size: var(--reader-font-size, 1rem); max-width: var(--reader-width, 45rem); }
+    article { margin: 0 auto; font-size: var(--reader-font-size, 1rem); max-width: var(--reader-width, 45rem); }
     /* Appearance is two attributes on <article>; paragraphs only inherit, so a long chapter costs nothing extra. */
     article[data-font=small] { --reader-font-size: 0.875rem; }
     article[data-font=large] { --reader-font-size: 1.25rem; }
@@ -65,6 +63,7 @@ const SELECTION_DELAY_MS = 150;
             }
           </nav>
         }
+        <app-workspace [selection]="selection()" [resetKey]="chapter()">
         <article [attr.data-font]="appearance.values()['reader.fontSize']" [attr.data-width]="appearance.values()['reader.width']">
           @if (chapter(); as chapter) {
           <h2>{{ chapter.title }}</h2>
@@ -79,14 +78,8 @@ const SELECTION_DELAY_MS = 150;
             <p>Loading...</p>
           }
         </article>
+        </app-workspace>
       </div>
-      @if (selection(); as current) {
-        <app-selection-toolbar [selection]="current.selection" [anchor]="current.anchor" (translate)="translate($event)" />
-      }
-      @if (aiPanel(); as panel) {
-        <app-ai-panel [title]="panel.title" [text]="panel.text" [error]="panel.error" [loading]="panel.loading"
-                      (closed)="closeAiPanel()" />
-      }
     }
   `,
 })
@@ -94,7 +87,6 @@ export class ReaderComponent {
   private readonly api = inject(ReaderService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
-  private readonly llm = inject(LlmService);
 
   protected readonly appearance = inject(AppearanceService);
   protected readonly controls = [
@@ -125,13 +117,9 @@ export class ReaderComponent {
   // Closed by default on narrow screens (matchMedia is missing in some test environments).
   protected readonly panelOpen = signal(window.matchMedia?.('(min-width: 800px)').matches ?? true);
 
-  // The text currently selected inside the chapter, with its viewport rectangle; null when nothing usable is selected.
-  protected readonly selection = signal<{ selection: TextSelection; anchor: DOMRect } | null>(null);
+  // The text currently selected inside the chapter; null when nothing usable is selected.
+  protected readonly selection = signal<TextSelection | null>(null);
   private selectionTimer: ReturnType<typeof setTimeout> | undefined;
-
-  // The AI result panel; null when closed. Only one request runs at a time.
-  protected readonly aiPanel = signal<{ title: string; text: string; error: string; loading: boolean } | null>(null);
-  private aiRequest: AbortController | null = null;
 
   // Guards against a slow earlier response overwriting a newer one.
   private loadToken = 0;
@@ -156,7 +144,6 @@ export class ReaderComponent {
     inject(DestroyRef).onDestroy(() => {
       document.removeEventListener('selectionchange', onSelectionChange);
       clearTimeout(this.selectionTimer);
-      this.aiRequest?.abort();
       // Invalidate any in-flight load so it cannot save or start observing after destroy.
       this.loadToken++;
       this.stopObserving();
@@ -172,36 +159,11 @@ export class ReaderComponent {
     void this.router.navigate([], { queryParams: { chapter: index }, queryParamsHandling: 'merge' });
   }
 
-  protected async translate({ text, context }: TextSelection): Promise<void> {
-    this.aiRequest?.abort(); // a new request replaces the running one
-    const request = (this.aiRequest = new AbortController());
-    this.aiPanel.set({ title: 'Translation', text: '', error: '', loading: true });
-    try {
-      for await (const chunk of this.llm.translate(text, context, request.signal)) {
-        // A replaced or closed request must not write into a newer panel.
-        if (this.aiRequest !== request) break;
-        this.aiPanel.update((p) => p && { ...p, text: p.text + chunk, loading: false });
-      }
-    } catch (e) {
-      if (!request.signal.aborted) {
-        this.aiPanel.update((p) => p && { ...p, error: e instanceof Error ? e.message : 'The AI request failed.' });
-      }
-    } finally {
-      if (this.aiRequest === request) this.aiPanel.update((p) => p && { ...p, loading: false });
-    }
-  }
-
-  protected closeAiPanel(): void {
-    this.aiRequest?.abort();
-    this.aiRequest = null;
-    this.aiPanel.set(null);
-  }
-
   private updateSelection(): void {
     const article = this.host.nativeElement.querySelector('article');
     const sel = window.getSelection();
     const captured = article && captureSelection(sel, article);
-    this.selection.set(captured ? { selection: captured, anchor: sel!.getRangeAt(0).getBoundingClientRect() } : null);
+    this.selection.set(captured || null);
   }
 
   private async load(bookId: number, requested: number | null): Promise<void> {
@@ -209,7 +171,6 @@ export class ReaderComponent {
     this.error.set('');
     this.chapter.set(null);
     this.selection.set(null);
-    this.closeAiPanel(); // the result belongs to the text of the previous chapter
     this.stopObserving();
     // A pending save of the previous chapter is superseded by this load; another book's save must still go out.
     if (this.pending && this.pending.bookId !== bookId) this.flush();

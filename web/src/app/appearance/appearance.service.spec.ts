@@ -65,4 +65,28 @@ describe('AppearanceService', () => {
     expect(service.values()['reader.theme']).toBe('dark');
     expect(service.saveError()).toContain('Could not save');
   });
+
+  describe('panelWidth', () => {
+    it('loads a valid saved value', async () => {
+      settings.load.mockResolvedValue({ 'reader.panelWidth': '55' });
+      const service = create();
+      await service.load();
+      expect(service.panelWidth()).toBe(55);
+    });
+
+    it.each(['5', '71', '40.5', 'abc', ''])('ignores the invalid saved value "%s"', async (value) => {
+      settings.load.mockResolvedValue({ 'reader.panelWidth': value });
+      const service = create();
+      await service.load();
+      expect(service.panelWidth()).toBe(40);
+    });
+
+    it('clamps the width, applies it at once and saves it', async () => {
+      const service = create();
+      const done = service.setPanelWidth(90);
+      expect(service.panelWidth()).toBe(70);
+      await done;
+      expect(settings.save).toHaveBeenCalledWith({ 'reader.panelWidth': '70' });
+    });
+  });
 });

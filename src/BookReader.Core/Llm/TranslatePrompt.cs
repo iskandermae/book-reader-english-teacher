@@ -13,7 +13,7 @@ public static class TranslatePrompt
         Translate the text between the <text> tags into {targetLanguage}.
         Translate only that text. No preface, no quotes, no notes, no explanations. Reply in exactly two lines:
         Native: [translation, as native speakers would say]
-        Literal: [translation, word-for-word, how the original text is understood]
+        Literal: [translation, Перекладай максимально близько до оригіналу, але зберігай зміст, не перекладай дослівно окремі слова. Для ідіом і фразових конструкцій показуй буквальний зміст у примітках у дужках. Мета перекладу - допомогти зрозуміти англійське формулювання, як вони думають.]
 
         <text>
         {text.Trim()}

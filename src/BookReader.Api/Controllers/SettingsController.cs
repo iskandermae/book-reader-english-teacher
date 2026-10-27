@@ -17,7 +17,7 @@ public class SettingsController(ISettingsService settings) : ControllerBase
 
     /// <summary>Updates one or more settings. The request is all or nothing; returns all settings after the update.</summary>
     /// <param name="ct">Cancels the request.</param>
-    /// <param name="values">Key/value map. Only known keys are accepted; values may be at most 1000 characters. reader.fontSize: small|medium|large|xlarge; reader.theme: light|dark; reader.width: narrow|medium|wide.</param>
+    /// <param name="values">Key/value map. Only known keys are accepted; values may be at most 1000 characters. reader.fontSize: small|medium|large|xlarge; reader.theme: light|dark; reader.width: narrow|medium|wide; reader.panelWidth: whole number 20-70 (percent, default 40).</param>
     /// <response code="400">Unknown key or invalid value; the detail field explains what to fix.</response>
     [HttpPut]
     [ProducesResponseType<Dictionary<string, string>>(StatusCodes.Status200OK)]

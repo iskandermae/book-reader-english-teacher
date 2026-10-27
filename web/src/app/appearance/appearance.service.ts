@@ -8,6 +8,9 @@ export const APPEARANCE_OPTIONS = {
   'reader.width': ['medium', 'narrow', 'wide'],
 } as const;
 
+/** Share of the page width given to the result panel, in percent (mirrors the backend range). */
+export const PANEL_WIDTH = { key: 'reader.panelWidth', min: 20, max: 70, default: 40 } as const;
+
 export type AppearanceKey = keyof typeof APPEARANCE_OPTIONS;
 
 const defaults = (): Record<AppearanceKey, string> => ({
@@ -27,6 +30,7 @@ export class AppearanceService {
   readonly values = signal<Record<AppearanceKey, string>>(defaults());
   /** Non-empty when the last save failed; the new look stays for the session. */
   readonly saveError = signal('');
+  readonly panelWidth = signal<number>(PANEL_WIDTH.default);
 
   constructor() {
     effect(() => document.documentElement.classList.toggle('dark', this.values()['reader.theme'] === 'dark'));
@@ -41,6 +45,8 @@ export class AppearanceService {
         if ((APPEARANCE_OPTIONS[key] as readonly string[]).includes(saved[key])) next[key] = saved[key];
       }
       this.values.set(next);
+      const width = Number(saved[PANEL_WIDTH.key]);
+      if (Number.isInteger(width) && width >= PANEL_WIDTH.min && width <= PANEL_WIDTH.max) this.panelWidth.set(width);
     } catch {
       // Defaults stay; the reader still works.
     }
@@ -52,6 +58,18 @@ export class AppearanceService {
     this.saveError.set('');
     try {
       await this.settings.save({ [key]: value });
+    } catch {
+      this.saveError.set('Could not save your appearance choice. It applies until you close the app.');
+    }
+  }
+
+  /** Applies the width at once (clamped), then saves it; call it when a drag ends, not on every move. */
+  async setPanelWidth(percent: number): Promise<void> {
+    const width = Math.min(PANEL_WIDTH.max, Math.max(PANEL_WIDTH.min, Math.round(percent)));
+    this.panelWidth.set(width);
+    this.saveError.set('');
+    try {
+      await this.settings.save({ [PANEL_WIDTH.key]: String(width) });
     } catch {
       this.saveError.set('Could not save your appearance choice. It applies until you close the app.');
     }

@@ -47,6 +47,31 @@ Depends on: Epic 1. MVP is complete after S2.7.
 - Each of the three runs in well under 100 ms. No timing assertions are committed.
 - Out of scope: shared host per test class, in-memory SQLite (postponed; the other API tests are ~1.5 s each under parallel load).
 
+## S2.3c Workspace layout: fixed action bar and result panel — Story (backend + frontend) — DONE
+Decided with the user: the floating toolbar and the overlay panel (S2.2/S2.3) are replaced. S2.4/S2.5/S2.6 only add buttons.
+**Acceptance**
+- Backend (first): new setting `reader.panelWidth`, default `40` (percent of the page width), allowed range 20-70 (else validation error like the other `reader.*` settings). Defaults line, validation, `api/openapi.json` description, unit test. Needed because the app stores all data in `data`, not in browser localStorage (found by frontend-dev).
+- The reader page is a split view: text on the left, a result panel on the right (default ~40% of the workspace width, i.e. the area right of the chapter list). The panel never overlays the text. On narrow screens the panel is stacked under the text.
+- The divider is draggable (mouse; keyboard arrows when it is focused). The width is remembered across reloads, the same way reader appearance settings are.
+- The panel has a fixed action bar on top: the "Translate" button (more buttons come with S2.4-S2.6). Buttons are always visible and disabled while nothing is selected.
+- The panel shows a short preview of the current selection (the job of the old toolbar), then the streamed result, then errors with hints (as today). Close button is replaced by "Clear". Cancel and stale-chunk behavior from S2.3 stay (new request or chapter change cancels and clears).
+- The floating toolbar is removed. Selection capture (`capture-selection.ts`) and its tests stay.
+- The workspace (split view, action bar, preview, result, divider) is its own component with inputs/outputs that do not depend on `ReaderComponent`, so S2.3d can reuse it with another text source.
+- Tests: component tests for enabled/disabled buttons, preview, streamed result, error, clear/cancel, divider keyboard resize and remembered width (service mocked). No layout pixel assertions.
+- Out of scope: new AI actions, scratchpad (S2.3d), touch-specific resizing.
+- Note: with the toolbar gone, selecting text is not cleared by clicking an action button (mousedown on the bar must not clear the selection).
+
+## S2.3d Scratchpad: work with pasted text — Story (backend + frontend)
+Depends on S2.3c.
+**Acceptance**
+- Backend: `GET /api/scratchpad` returns `{ text }` (empty when never set); `PUT /api/scratchpad` `{ text }` saves it. Stored in SQLite, one row, in the `data` folder as all app data. Limit 200,000 characters (400 above). `api/openapi.json` updated. Unit tests (default empty, save, replace, over the limit).
+- Frontend: a "Text" page reachable from the main navigation. It uses the workspace from S2.3c with an editable text area as the left side. Selecting text in it works exactly like in the reader (same buttons, preview, result).
+- Selection capture works in a text area (selectionStart/End) and produces `{ text, context }` with the same rules as S2.2; a pure function with unit tests.
+- Text is saved automatically (debounced) and restored on return. "Clear text" button with confirmation.
+- Tests: page loads saved text, saves after edit (debounce with fake timers), capture from a text area, selecting enables buttons.
+- Out of scope: several scratchpads, saving results, importing the pasted text as a book.
+- Assumption: a single scratchpad; the whole text is the only context for sentence/paragraph rules.
+
 ## S2.4 Explain selection — Story — TODO
 **Acceptance**
 - "Explain" gives meaning, grammar and usage in this context.
@@ -72,3 +97,13 @@ Depends on: Epic 1. MVP is complete after S2.7.
 - Results are cached in SQLite per (selection, context hash, action, model, settings).
 - A repeated request returns without calling the model.
 - Cache can be cleared from the Settings page.
+
+## S2.8 Optional cloud LLM provider — Story (backend + frontend) — TODO
+Depends on S2.6 (settings UI) and S2.7 (cache key includes provider and model). Outside the MVP: the app must stay fully usable with Ollama only (D5).
+**Acceptance (high level, to groom)**
+- A second `ILlmProvider` implementation for one cloud API; the provider is chosen by a setting (`llm.provider`: `ollama` default, or `cloud`). Provider is picked per call from settings (no restart).
+- Settings: provider, cloud model, API key. The key is stored on the backend only and never returned by the API (only "key is set").
+- Settings UI: provider switch, model, API key field, "Test connection".
+- Same streaming (SSE) and error mapping as Ollama (missing key -> 400 with hint, network/401 -> clear message).
+- Unit tests with a fake HTTP handler; no network.
+- Open questions: which cloud API (OpenAI-compatible or Anthropic)? Model list or free text? Is a per-action provider needed?

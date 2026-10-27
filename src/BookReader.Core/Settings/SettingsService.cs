@@ -28,7 +28,10 @@ public class SettingsService(AppDbContext db) : ISettingsService
     public const string ReaderFontSize = "reader.fontSize";
     public const string ReaderTheme = "reader.theme";
     public const string ReaderWidth = "reader.width";
+    public const string ReaderPanelWidth = "reader.panelWidth"; // result panel width, percent of the page
     public const int MaxValueLength = 1000;
+    private const int MinPanelWidth = 20;
+    private const int MaxPanelWidth = 70;
 
     // Known keys with their defaults. Adding a setting = adding a line here (no migration needed).
     // The Ollama model is deliberately empty: the model name is never hardcoded (decision D12).
@@ -42,6 +45,7 @@ public class SettingsService(AppDbContext db) : ISettingsService
         [ReaderFontSize] = "medium",
         [ReaderTheme] = "light",
         [ReaderWidth] = "medium",
+        [ReaderPanelWidth] = "40",
     };
 
     // Keys that accept only a fixed set of values (an empty string is not allowed for them).
@@ -114,6 +118,8 @@ public class SettingsService(AppDbContext db) : ISettingsService
                 errors.Add($"Setting '{key}' is too long ({value.Length} characters, maximum is {MaxValueLength}).");
             else if (AllowedValues.TryGetValue(key, out var allowed) && !allowed.Contains(value))
                 errors.Add($"Setting '{key}' must be one of: {string.Join(", ", allowed)}.");
+            else if (key == ReaderPanelWidth && !IsValidPanelWidth(value))
+                errors.Add($"Setting '{ReaderPanelWidth}' must be a whole number from {MinPanelWidth} to {MaxPanelWidth}.");
             else if (key == ChapterRegex)
                 ValidateChapterRegex(value, errors);
             else if (key == OllamaUrl && !IsHttpUrl(value))
@@ -122,6 +128,11 @@ public class SettingsService(AppDbContext db) : ISettingsService
         if (errors.Count > 0)
             throw new SettingsValidationException(string.Join(" ", errors));
     }
+
+    // Invariant culture and digits only: no signs, spaces or decimals, so each value has one spelling.
+    private static bool IsValidPanelWidth(string value) =>
+        value.All(char.IsAsciiDigit)
+        && int.TryParse(value, out var percent) && percent is >= MinPanelWidth and <= MaxPanelWidth;
 
     private static bool IsHttpUrl(string value) =>
         Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https";

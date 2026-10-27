@@ -26,7 +26,8 @@ public sealed class SettingsServiceTests : IDisposable
     {
         var all = await _service.GetAllAsync();
 
-        Assert.Equal(8, all.Count);
+        Assert.Equal(9, all.Count);
+        Assert.Equal("40", all[SettingsService.ReaderPanelWidth]);
         Assert.Equal("Ukrainian", all[SettingsService.LanguageNative]);
         Assert.Equal("http://localhost:11434", all[SettingsService.OllamaUrl]);
         Assert.Equal("medium", all[SettingsService.ReaderFontSize]);
@@ -116,6 +117,32 @@ public sealed class SettingsServiceTests : IDisposable
             new Dictionary<string, string?> { [key] = value }));
 
         Assert.Contains($"'{key}'", ex.Message);
+    }
+
+    [Theory]
+    [InlineData("20")]
+    [InlineData("70")]
+    public async Task Update_accepts_panel_width_at_range_edges(string value)
+    {
+        var all = await _service.UpdateAsync(new Dictionary<string, string?> { [SettingsService.ReaderPanelWidth] = value });
+
+        Assert.Equal(value, all[SettingsService.ReaderPanelWidth]);
+    }
+
+    [Theory]
+    [InlineData("19")]
+    [InlineData("71")]
+    [InlineData("")]
+    [InlineData("abc")]
+    [InlineData("40.5")]
+    [InlineData("+40")]
+    [InlineData(" 40")]
+    public async Task Update_rejects_bad_panel_width(string value)
+    {
+        var ex = await Assert.ThrowsAsync<SettingsValidationException>(() => _service.UpdateAsync(
+            new Dictionary<string, string?> { [SettingsService.ReaderPanelWidth] = value }));
+
+        Assert.Contains($"'{SettingsService.ReaderPanelWidth}'", ex.Message);
     }
 
     [Fact]
