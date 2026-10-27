@@ -61,7 +61,7 @@ Decided with the user: the floating toolbar and the overlay panel (S2.2/S2.3) ar
 - Out of scope: new AI actions, scratchpad (S2.3d), touch-specific resizing.
 - Note: with the toolbar gone, selecting text is not cleared by clicking an action button (mousedown on the bar must not clear the selection).
 
-## S2.3d Scratchpad: work with pasted text — Story (backend + frontend)
+## S2.3d Scratchpad: work with pasted text — Story (backend + frontend) — DONE
 Depends on S2.3c.
 **Acceptance**
 - Backend: `GET /api/scratchpad` returns `{ text }` (empty when never set); `PUT /api/scratchpad` `{ text }` saves it. Stored in SQLite, one row, in the `data` folder as all app data. Limit 200,000 characters (400 above). `api/openapi.json` updated. Unit tests (default empty, save, replace, over the limit).

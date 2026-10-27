@@ -2,6 +2,7 @@ using BookReader.Api.Filters;
 using BookReader.Core.Books;
 using BookReader.Core.Data;
 using BookReader.Core.Llm;
+using BookReader.Core.Scratchpad;
 using BookReader.Core.Settings;
 using Microsoft.EntityFrameworkCore;
 
@@ -16,6 +17,7 @@ builder.Services.AddOpenApi();
 builder.Services.AddScoped<SettingsValidationExceptionFilter>();
 builder.Services.AddScoped<BookImportExceptionFilter>();
 builder.Services.AddScoped<ISettingsService, SettingsService>();
+builder.Services.AddScoped<IScratchpadService, ScratchpadService>();
 builder.Services.AddScoped<LlmExceptionFilter>();
 builder.Services.AddScoped<ILlmProvider, OllamaProvider>();
 builder.Services.AddScoped<IBookImportService, BookImportService>();

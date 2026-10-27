@@ -8,7 +8,8 @@ import { SettingsMap, SettingsService } from './settings.service';
   imports: [FormsModule, RouterLink],
   template: `
     <h1>Settings</h1>
-    <a routerLink="/">Library</a>
+    <a routerLink="/">Library</a>{{ ' ' }}
+    <a routerLink="/text">Text</a>
     <form (ngSubmit)="save()">
       <!-- [name] feeds NgModel (form control name); [attr.name] sets the DOM attribute, which NgModel does not. -->
       @for (key of keys(); track key) {

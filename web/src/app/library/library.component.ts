@@ -9,6 +9,7 @@ import { BookSummary, BooksService } from './books.service';
   imports: [DatePipe, FormsModule, RouterLink],
   template: `
     <h1>Library</h1>
+    <a routerLink="/text">Text</a>{{ ' ' }}
     <a routerLink="/settings">Settings</a>
 
     <form (ngSubmit)="upload()">

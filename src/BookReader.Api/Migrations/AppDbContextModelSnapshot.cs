@@ -93,6 +93,21 @@ namespace BookReader.Api.Migrations
                     b.ToTable("Paragraphs");
                 });
 
+            modelBuilder.Entity("BookReader.Core.Scratchpad.ScratchpadText", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Scratchpad", (string)null);
+                });
+
             modelBuilder.Entity("BookReader.Core.Settings.Setting", b =>
                 {
                     b.Property<string>("Key")

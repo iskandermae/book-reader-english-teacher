@@ -1,4 +1,5 @@
 using BookReader.Core.Books;
+using BookReader.Core.Scratchpad;
 using BookReader.Core.Settings;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,6 +9,7 @@ namespace BookReader.Core.Data;
 public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
     public DbSet<Setting> Settings => Set<Setting>();
+    public DbSet<ScratchpadText> Scratchpad => Set<ScratchpadText>();
     public DbSet<Book> Books => Set<Book>();
     public DbSet<Chapter> Chapters => Set<Chapter>();
     public DbSet<Paragraph> Paragraphs => Set<Paragraph>();
@@ -20,6 +22,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             e.Property(s => s.Key).HasMaxLength(100);
             e.Property(s => s.Value).HasMaxLength(SettingsService.MaxValueLength);
         });
+
+        // Single row (Id = 1); the text limit is enforced by the service, not the column.
+        modelBuilder.Entity<ScratchpadText>(e => e.ToTable("Scratchpad"));
 
         modelBuilder.Entity<Book>(e =>
         {
