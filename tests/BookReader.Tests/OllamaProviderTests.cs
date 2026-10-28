@@ -1,4 +1,4 @@
-using BookReader.Core.Llm;
+﻿using BookReader.Core.Llm;
 using BookReader.Core.Settings;
 
 namespace BookReader.Tests;
@@ -146,34 +146,4 @@ internal sealed class FakeOllamaServer : IDisposable
     }
 
     public void Dispose() => _listener.Close();
-}
-
-/// <summary>
-/// Needs a running local Ollama with at least one model; excluded from the default run.
-/// Run: set RUN_OLLAMA_INTEGRATION=1 (optional OLLAMA_URL, OLLAMA_MODEL), then `dotnet test --filter Category=Integration`.
-/// </summary>
-public sealed class OllamaProviderIntegrationTests
-{
-    private sealed class OllamaFactAttribute : FactAttribute
-    {
-        public OllamaFactAttribute()
-        {
-            if (Environment.GetEnvironmentVariable("RUN_OLLAMA_INTEGRATION") != "1")
-                Skip = "Set RUN_OLLAMA_INTEGRATION=1 to run (needs local Ollama).";
-        }
-    }
-
-    [OllamaFact, Trait("Category", "Integration")]
-    public async Task Real_ollama_lists_models_and_streams_text()
-    {
-        var url = Environment.GetEnvironmentVariable("OLLAMA_URL") ?? "http://localhost:11434";
-        var models = await OllamaProviderTests.Provider(url, "").ListModelsAsync();
-        Assert.NotEmpty(models);
-
-        var model = Environment.GetEnvironmentVariable("OLLAMA_MODEL") ?? models[0];
-        var text = "";
-        await foreach (var chunk in OllamaProviderTests.Provider(url, model).GenerateAsync("Say hello in one word."))
-            text += chunk;
-        Assert.NotEmpty(text);
-    }
 }

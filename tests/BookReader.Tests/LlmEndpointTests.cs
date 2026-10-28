@@ -201,6 +201,46 @@ public sealed class LlmEndpointTests : ApiTestBase
         }, HttpStatusCode.BadRequest, "Set your native language in settings.");
     }
 
+    [Fact]
+    public async Task Explain_streams_explanation_with_selection_and_context_in_prompt()
+    {
+        _llm.Chunks = ["Meaning: a", " b"];
+        await using var app = NewAppWithFakeLlm();
+        using var client = app.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/llm/explain", new ExplainRequest("Hello", "Hello, world."));
+
+        Assert.Equal("text/event-stream", response.Content.Headers.ContentType!.MediaType);
+        Assert.Equal("data: \"Meaning: a\"\n\ndata: \" b\"\n\nevent: done\ndata: \n\n", await response.Content.ReadAsStringAsync());
+        Assert.Contains("Hello", _llm.LastPrompt);
+        Assert.Contains("Hello, world.", _llm.LastPrompt);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task Explain_returns_400_for_blank_text(string text)
+    {
+        await AssertProblemAsync(c => c.PostAsJsonAsync("/api/llm/explain", new ExplainRequest(text)),
+            HttpStatusCode.BadRequest, "Text must not be empty.");
+    }
+
+    [Fact]
+    public async Task Explain_returns_400_when_no_model_is_chosen()
+    {
+        _llm.Failure = new LlmNotConfiguredException("Choose a model in settings.");
+        await AssertProblemAsync(c => c.PostAsJsonAsync("/api/llm/explain", new ExplainRequest("Hello")),
+            HttpStatusCode.BadRequest, "Choose a model in settings.");
+    }
+
+    [Fact]
+    public async Task Explain_returns_503_with_hint_when_ollama_is_down()
+    {
+        _llm.Failure = new LlmUnavailableException("Start Ollama.");
+        await AssertProblemAsync(c => c.PostAsJsonAsync("/api/llm/explain", new ExplainRequest("Hello")),
+            HttpStatusCode.ServiceUnavailable, "Start Ollama.");
+    }
+
     private async Task AssertProblemAsync(Func<HttpClient, Task<HttpResponseMessage>> call, HttpStatusCode status, string detail)
     {
         await using var app = NewAppWithFakeLlm();

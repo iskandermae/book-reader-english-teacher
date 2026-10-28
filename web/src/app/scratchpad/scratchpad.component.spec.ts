@@ -18,7 +18,7 @@ describe('ScratchpadComponent', () => {
       providers: [
         provideRouter([]),
         { provide: ScratchpadService, useValue: service },
-        { provide: LlmService, useValue: { translate: vi.fn() } },
+        { provide: LlmService, useValue: { translate: vi.fn(), explain: vi.fn() } },
       ],
     });
     const fixture = TestBed.createComponent(ScratchpadComponent);

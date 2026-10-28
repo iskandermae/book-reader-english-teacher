@@ -10,7 +10,7 @@ Depends on: Epic 1. MVP is complete after S2.7.
 - `GET /api/llm/models`: installed model names. Ollama down -> 503 with a clear message and hint ("Start Ollama...").
 - `POST /api/llm/test` `{ prompt }`: streams text as Server-Sent Events (this is the streaming format S2.3-S2.5 will reuse). Empty `ollama.model` -> 400 "Choose a model in settings". Ollama down -> 503 with hint.
 - `api/openapi.json` updated.
-- Unit tests with a fake provider (status, models, streaming, error mapping); no network, no Ollama. The Ollama implementation is covered by one optional integration test, excluded from the default run (category/trait).
+- Unit tests with a fake provider (status, models, streaming, error mapping); no network, no Ollama. The Ollama implementation has no automated test (the optional integration test was removed on 2026-10-28).
 - Out of scope: frontend, model picker UI (S2.6), prompts (S2.3+), cloud providers.
 
 ## S2.2 Text selection toolbar — Story (frontend only) — DONE
@@ -72,10 +72,17 @@ Depends on S2.3c.
 - Out of scope: several scratchpads, saving results, importing the pasted text as a book.
 - Assumption: a single scratchpad; the whole text is the only context for sentence/paragraph rules.
 
-## S2.4 Explain selection — Story — TODO
+## S2.4 Explain selection — Story (backend + frontend) — DONE
+Decided with the user: answer in simple English (not the native language), 3 labeled lines, selection + context sent.
 **Acceptance**
-- "Explain" gives meaning, grammar and usage in this context.
-- Same streaming and error behavior as S2.3.
+- Backend (first): `POST /api/llm/explain` `{ text, context }` streams SSE (same format, validation and error mapping as `/api/llm/translate`: empty `text` -> 400, empty model -> 400, Ollama down -> 503 with hint).
+- Prompt building is a pure, unit-tested function (text, context -> prompt). The model explains only the selected `text`, using `context` to pick the meaning in this sentence. Output is plain text, no preface, three lines: `Meaning: ...`, `Grammar: ...`, `Usage: ...`. Simple English. Shown as is in the panel.
+- Reuse the shared code from S2.3 for the endpoint/SSE/error handling instead of copying it (small refactor inside the translate endpoint is allowed if needed).
+- `api/openapi.json` updated. Unit tests with the fake provider (streaming, prompt content incl. context, error mapping); no network.
+- Frontend: an "Explain" button in the workspace action bar next to "Translate"; same enabled/disabled rule, same panel behavior (stream, error with hint, Clear, cancel on new request/chapter change). Works in the reader and on the Text page.
+- Frontend: move the SSE/error handling in `LlmService` into one shared helper used by Translate and Explain (frontend-dev proposal), so S2.5 adds only one method.
+- Frontend tests: Explain button calls the service with `{ text, context }` and shows streamed chunks and errors (service mocked).
+- Out of scope: custom prompts and English level (S2.6), caching (S2.7).
 
 ## S2.5 Simplify selection — Story — TODO
 **Acceptance**

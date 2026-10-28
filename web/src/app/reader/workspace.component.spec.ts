@@ -6,12 +6,12 @@ import { WorkspaceComponent } from './workspace.component';
 
 describe('WorkspaceComponent', () => {
   type Mock = ReturnType<typeof vi.fn>;
-  let llm: { translate: Mock };
+  let llm: { translate: Mock; explain: Mock };
   let settings: { load: Mock; save: Mock };
   const selection = { text: 'first 0', context: 'first 0 context' };
 
   beforeEach(() => {
-    llm = { translate: vi.fn() };
+    llm = { translate: vi.fn(), explain: vi.fn() };
     settings = { load: vi.fn().mockResolvedValue({}), save: vi.fn().mockResolvedValue({}) };
     TestBed.configureTestingModule({
       providers: [
@@ -52,6 +52,24 @@ describe('WorkspaceComponent', () => {
     });
     return { push, signals };
   }
+
+  it('Explain sends the selection and context to the explain action and shows the result and errors', async () => {
+    llm.explain.mockImplementation(async function* () {
+      yield 'Meaning: x';
+      throw new Error('Ollama is not running.');
+    });
+    const { fixture, el, button } = create();
+    button('Explain').click();
+    await settle(fixture);
+    expect(llm.explain).toHaveBeenCalledWith('first 0', 'first 0 context', expect.any(AbortSignal));
+    expect(llm.translate).not.toHaveBeenCalled();
+    expect(el.querySelector('.text-result')!.textContent).toBe('Meaning: x');
+    expect(el.querySelector('[role=alert]')!.textContent).toContain('Ollama is not running.');
+  });
+
+  it('disables Explain while nothing is selected', () => {
+    expect(create(null).button('Explain').disabled).toBe(true);
+  });
 
   const settle = async (fixture: { detectChanges(): void }) => {
     await new Promise((r) => setTimeout(r));

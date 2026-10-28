@@ -41,7 +41,8 @@ const KEY_STEP = 2; // percent per arrow press
     <aside [style.width.%]="width()" aria-label="AI tools">
       <!-- mousedown is prevented so clicking an action does not clear the text selection -->
       <div class="bar" role="toolbar" aria-label="Selection tools" (mousedown)="$event.preventDefault()">
-        <button type="button" [disabled]="!kept()" (click)="translate()">Translate</button>
+        <button type="button" [disabled]="!kept()" (click)="run('translate')">Translate</button>
+        <button type="button" [disabled]="!kept()" (click)="run('explain')">Explain</button>
         <button type="button" [disabled]="!result()" (click)="clear()">Clear</button>
       </div>
       @if (preview(); as text) {
@@ -100,14 +101,14 @@ export class WorkspaceComponent {
     inject(DestroyRef).onDestroy(() => this.request?.abort());
   }
 
-  protected async translate(): Promise<void> {
+  protected async run(action: 'translate' | 'explain'): Promise<void> {
     const selected = this.kept();
     if (!selected) return;
     this.request?.abort(); // a new request replaces the running one
     const request = (this.request = new AbortController());
     this.result.set({ text: '', error: '', loading: true });
     try {
-      for await (const chunk of this.llm.translate(selected.text, selected.context, request.signal)) {
+      for await (const chunk of this.llm[action](selected.text, selected.context, request.signal)) {
         // A replaced or cleared request must not write into a newer result.
         if (this.request !== request) break;
         this.result.update((r) => r && { ...r, text: r.text + chunk, loading: false });

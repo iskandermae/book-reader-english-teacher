@@ -749,6 +749,66 @@
         }
       }
     },
+    "/api/llm/explain": {
+      "post": {
+        "tags": [
+          "Llm"
+        ],
+        "summary": "Explains the selected text in simple English as three lines (Meaning, Grammar, Usage) and streams the answer.\r\nThe stream format is the same as in the test endpoint. `context` only helps the model choose the meaning in this sentence.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExplainRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExplainRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExplainRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Blank text, no model chosen in settings, or the chosen model is not installed.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Ollama is not reachable; the detail field says how to fix it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/scratchpad": {
       "get": {
         "tags": [
@@ -1129,6 +1189,26 @@
           }
         },
         "description": "A chapter in a book's chapter list."
+      },
+      "ExplainRequest": {
+        "required": [
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "The selected text to explain. Required."
+          },
+          "context": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The sentence(s) around the selection, used to pick the meaning. Optional."
+          }
+        },
+        "description": "Request of the explain endpoint."
       },
       "HealthResponse": {
         "required": [

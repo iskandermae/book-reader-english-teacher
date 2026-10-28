@@ -1,17 +1,30 @@
 import { Injectable } from '@angular/core';
-import { postApiLlmTranslate } from '../api';
+import { postApiLlmExplain, postApiLlmTranslate } from '../api';
+
+/** The generated SSE endpoints share one request/response shape; this is what the helper needs from them. */
+type StreamingCall = typeof postApiLlmTranslate | typeof postApiLlmExplain;
 
 /** Thin wrapper over the generated client so components can be tested without HTTP. */
 @Injectable({ providedIn: 'root' })
 export class LlmService {
+  /** Streams the translation of `text` chunk by chunk (see `stream` for cancel and error behavior). */
+  translate(text: string, context: string, signal: AbortSignal): AsyncGenerator<string> {
+    return this.stream(postApiLlmTranslate, text, context, signal);
+  }
+
+  /** Streams a simple-English explanation of `text` in its `context`. */
+  explain(text: string, context: string, signal: AbortSignal): AsyncGenerator<string> {
+    return this.stream(postApiLlmExplain, text, context, signal);
+  }
+
   /**
-   * Streams the translation of `text` chunk by chunk. Aborting `signal` ends the stream quietly.
+   * Shared SSE/error handling of all AI actions. Aborting `signal` ends the stream quietly.
    * Throws an Error with a readable message when the request is rejected or the model fails mid-stream.
    */
-  async *translate(text: string, context: string, signal: AbortSignal): AsyncGenerator<string> {
+  private async *stream(call: StreamingCall, text: string, context: string, signal: AbortSignal): AsyncGenerator<string> {
     let streamError: string | undefined; // `event: error` sent by the server after the stream started
     let requestError: string | undefined; // the request itself failed (400/503 problem details, network)
-    const { stream } = await postApiLlmTranslate({
+    const { stream } = await call({
       body: { text, context },
       signal,
       // The generated client hides the response body of a failed request, so read the problem details here.

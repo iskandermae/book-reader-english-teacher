@@ -55,14 +55,39 @@ public class LlmController(ILlmProvider llm, ISettingsService settings) : Contro
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status503ServiceUnavailable, "application/problem+json")]
     public async Task<IActionResult> Translate([FromBody] TranslateRequest request, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(request.Text))
-            return BadRequest(new ProblemDetails { Title = "Invalid text", Detail = "Text must not be empty." });
+        if (IsBlankText(request.Text, out var invalid))
+            return invalid;
 
         var language = await settings.GetAsync(SettingsService.LanguageNative, ct);
         if (string.IsNullOrWhiteSpace(language))
             throw new LlmNotConfiguredException("Set your native language in settings.");
 
         return await StreamAsync(TranslatePrompt.Build(request.Text, language.Trim()), ct);
+    }
+
+    /// <summary>
+    /// Explains the selected text in simple English as three lines (Meaning, Grammar, Usage) and streams the answer.
+    /// The stream format is the same as in the test endpoint. <c>context</c> only helps the model choose the meaning in this sentence.
+    /// </summary>
+    /// <response code="400">Blank text, no model chosen in settings, or the chosen model is not installed.</response>
+    /// <response code="503">Ollama is not reachable; the detail field says how to fix it.</response>
+    [HttpPost("explain")]
+    [ProducesResponseType<string>(StatusCodes.Status200OK, "text/event-stream")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status503ServiceUnavailable, "application/problem+json")]
+    public async Task<IActionResult> Explain([FromBody] ExplainRequest request, CancellationToken ct)
+    {
+        if (IsBlankText(request.Text, out var invalid))
+            return invalid;
+
+        return await StreamAsync(ExplainPrompt.Build(request.Text, request.Context), ct);
+    }
+
+    // [ApiController] only rejects null; a blank selection is rejected here (shared by the selection tools).
+    private bool IsBlankText(string text, out IActionResult result)
+    {
+        result = BadRequest(new ProblemDetails { Title = "Invalid text", Detail = "Text must not be empty." });
+        return string.IsNullOrWhiteSpace(text);
     }
 
     private async Task<IActionResult> StreamAsync(string prompt, CancellationToken ct)
@@ -107,3 +132,8 @@ public record LlmTestRequest(string Prompt);
 /// <param name="Text">The selected text to translate. Required.</param>
 /// <param name="Context">The sentence(s) around the selection. Accepted but not used by the translate prompt yet.</param>
 public record TranslateRequest(string Text, string? Context = null);
+
+/// <summary>Request of the explain endpoint.</summary>
+/// <param name="Text">The selected text to explain. Required.</param>
+/// <param name="Context">The sentence(s) around the selection, used to pick the meaning. Optional.</param>
+public record ExplainRequest(string Text, string? Context = null);

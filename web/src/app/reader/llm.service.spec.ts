@@ -5,7 +5,10 @@ const sse = (...parts: string[]) =>
 const problem = (status: number, detail: string) =>
   new Response(JSON.stringify({ detail }), { status, headers: { 'Content-Type': 'application/problem+json' } });
 
-describe('LlmService.translate', () => {
+describe.each([
+  ['translate', '/api/llm/translate'],
+  ['explain', '/api/llm/explain'],
+] as const)('LlmService.%s', (method, path) => {
   const service = new LlmService();
   let fetchMock: ReturnType<typeof vi.fn>;
 
@@ -17,7 +20,7 @@ describe('LlmService.translate', () => {
 
   async function collect(signal = new AbortController().signal) {
     const chunks: string[] = [];
-    for await (const c of service.translate('hello', 'hello world', signal)) chunks.push(c);
+    for await (const c of service[method]('hello', 'hello world', signal)) chunks.push(c);
     return chunks;
   }
 
@@ -25,7 +28,7 @@ describe('LlmService.translate', () => {
     fetchMock.mockResolvedValue(sse('data: "He"\n\n', 'data: "llo"\n\n', 'event: done\ndata: \n\n'));
     expect(await collect()).toEqual(['He', 'llo']);
     const request: Request = fetchMock.mock.calls[0][0];
-    expect(new URL(request.url).pathname).toBe('/api/llm/translate');
+    expect(new URL(request.url).pathname).toBe(path);
     expect(await request.json()).toEqual({ text: 'hello', context: 'hello world' });
   });
 
