@@ -1,13 +1,14 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { ActionsService, CustomAction } from './actions.service';
 import { SettingsComponent } from './settings.component';
 import { SettingsService } from './settings.service';
 
 describe('SettingsComponent', () => {
-  async function render(service: Partial<SettingsService>) {
+  async function render(service: Partial<SettingsService>, actions: Partial<ActionsService> = { load: () => Promise.resolve([]), save: (list) => Promise.resolve(list) }) {
     TestBed.configureTestingModule({
       imports: [SettingsComponent],
-      providers: [provideRouter([]), { provide: SettingsService, useValue: service }],
+      providers: [provideRouter([]), { provide: SettingsService, useValue: service }, { provide: ActionsService, useValue: actions }],
     });
     const fixture = TestBed.createComponent(SettingsComponent);
     await fixture.whenStable();
@@ -59,8 +60,8 @@ describe('SettingsComponent', () => {
   describe('Prompts tab', () => {
     const loaded = { 'ui.sample': 's', 'prompt.translate': 'T {selection}', 'prompt.explain': 'E {selection}' };
 
-    async function openPrompts(service: Partial<SettingsService>) {
-      const fixture = await render(service);
+    async function openPrompts(service: Partial<SettingsService>, actions?: Partial<ActionsService>) {
+      const fixture = await render(service, actions);
       const el = fixture.nativeElement as HTMLElement;
       el.querySelectorAll<HTMLButtonElement>('[role=tab]')[1].click();
       fixture.detectChanges();
@@ -130,6 +131,79 @@ describe('SettingsComponent', () => {
       await fixture.whenStable();
       fixture.detectChanges();
       expect(el.querySelector('[role=alert]')!.textContent).toContain('unknown placeholder {x}');
+    });
+
+    describe('Custom actions', () => {
+      const existing: CustomAction[] = [{ id: 1, name: 'Simplify', prompt: 'Simplify {selection}' }];
+
+      async function openActions(actions: Partial<ActionsService>, settings: Partial<SettingsService> = {}) {
+        return openPrompts({ load: () => Promise.resolve(loaded), save: () => Promise.resolve(loaded), ...settings }, actions);
+      }
+      const addButton = (el: HTMLElement) => Array.from(el.querySelectorAll('button')).find((b) => b.textContent === 'Add action')!;
+      const submit = async (fixture: ComponentFixture<SettingsComponent>) => {
+        (fixture.nativeElement as HTMLElement).querySelector('form')!.dispatchEvent(new Event('submit'));
+        await fixture.whenStable();
+        fixture.detectChanges();
+      };
+      const type = (el: HTMLElement, selector: string, value: string) => {
+        const field = el.querySelector<HTMLInputElement | HTMLTextAreaElement>(selector)!;
+        field.value = value;
+        field.dispatchEvent(new Event('input'));
+      };
+
+      it('lists the loaded actions', async () => {
+        const { el } = await openActions({ load: () => Promise.resolve(existing) });
+        expect(el.querySelector<HTMLInputElement>('input[name="action-name-0"]')!.value).toBe('Simplify');
+        expect(el.querySelector<HTMLTextAreaElement>('textarea[name="action-prompt-0"]')!.value).toBe('Simplify {selection}');
+      });
+
+      it('adds, edits and saves the whole list with the Save button', async () => {
+        const save = vi.fn().mockResolvedValue([{ id: 1, name: 'Simplify', prompt: 'p {selection}' }, { id: 2, name: 'Short', prompt: 'Short {selection}' }]);
+        const { fixture, el } = await openActions({ load: () => Promise.resolve(existing), save });
+        addButton(el).click();
+        fixture.detectChanges();
+        await fixture.whenStable();
+        type(el, 'input[name="action-name-1"]', 'Short');
+        type(el, 'textarea[name="action-prompt-1"]', 'Short {selection}');
+        type(el, 'textarea[name="action-prompt-0"]', 'p {selection}');
+        await submit(fixture);
+
+        expect(save).toHaveBeenCalledWith([
+          { id: 1, name: 'Simplify', prompt: 'p {selection}' },
+          { name: 'Short', prompt: 'Short {selection}' },
+        ]);
+        expect(el.querySelector('[role=status]')!.textContent).toContain('Settings saved');
+      });
+
+      it('deletes an action', async () => {
+        const save = vi.fn().mockResolvedValue([]);
+        const { fixture, el } = await openActions({ load: () => Promise.resolve(existing), save });
+        Array.from(el.querySelectorAll('button')).find((b) => b.textContent === 'Delete')!.click();
+        fixture.detectChanges();
+        expect(el.querySelector('input[name="action-name-0"]')).toBeNull();
+        await submit(fixture);
+        expect(save).toHaveBeenCalledWith([]);
+      });
+
+      it('disables Add at 20 actions', async () => {
+        const many = Array.from({ length: 20 }, (_, i) => ({ id: i + 1, name: `A${i}`, prompt: '{selection}' }));
+        const { el } = await openActions({ load: () => Promise.resolve(many) });
+        expect(addButton(el).disabled).toBe(true);
+      });
+
+      it('shows the server message when saving the actions fails', async () => {
+        const { fixture, el } = await openActions({
+          load: () => Promise.resolve(existing),
+          save: () => Promise.reject(new Error('Action names must be unique.')),
+        });
+        await submit(fixture);
+        expect(el.querySelector('[role=alert]')!.textContent).toContain('Action names must be unique.');
+      });
+
+      it('shows a message when the actions cannot be loaded', async () => {
+        const fixture = await render({ load: () => Promise.resolve(loaded) }, { load: () => Promise.reject(new Error('boom')) });
+        expect((fixture.nativeElement as HTMLElement).querySelector('[role=alert]')!.textContent).toContain('Could not load settings');
+      });
     });
   });
 });

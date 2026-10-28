@@ -1,4 +1,5 @@
 using BookReader.Api.Filters;
+using BookReader.Core.Actions;
 using BookReader.Core.Books;
 using BookReader.Core.Data;
 using BookReader.Core.Llm;
@@ -17,6 +18,7 @@ builder.Services.AddOpenApi();
 builder.Services.AddScoped<SettingsValidationExceptionFilter>();
 builder.Services.AddScoped<BookImportExceptionFilter>();
 builder.Services.AddScoped<ISettingsService, SettingsService>();
+builder.Services.AddScoped<ICustomActionService, CustomActionService>();
 builder.Services.AddScoped<IScratchpadService, ScratchpadService>();
 builder.Services.AddScoped<LlmExceptionFilter>();
 builder.Services.AddScoped<ILlmProvider, OllamaProvider>();

@@ -1,22 +1,26 @@
 import { TestBed } from '@angular/core/testing';
 import { AppearanceService } from '../appearance/appearance.service';
+import { ActionsService } from '../settings/actions.service';
 import { SettingsService } from '../settings/settings.service';
 import { LlmService } from './llm.service';
 import { WorkspaceComponent } from './workspace.component';
 
 describe('WorkspaceComponent', () => {
   type Mock = ReturnType<typeof vi.fn>;
-  let llm: { translate: Mock; explain: Mock };
+  let llm: { translate: Mock; explain: Mock; runAction: Mock };
+  let actions: { load: Mock };
   let settings: { load: Mock; save: Mock };
   const selection = { text: 'first 0', context: 'first 0 context', paragraph: 'first 0 paragraph' };
 
   beforeEach(() => {
-    llm = { translate: vi.fn(), explain: vi.fn() };
+    llm = { translate: vi.fn(), explain: vi.fn(), runAction: vi.fn() };
+    actions = { load: vi.fn().mockResolvedValue([]) };
     settings = { load: vi.fn().mockResolvedValue({}), save: vi.fn().mockResolvedValue({}) };
     TestBed.configureTestingModule({
       providers: [
         { provide: LlmService, useValue: llm },
         { provide: SettingsService, useValue: settings },
+        { provide: ActionsService, useValue: actions },
       ],
     });
   });
@@ -65,6 +69,51 @@ describe('WorkspaceComponent', () => {
     expect(llm.translate).not.toHaveBeenCalled();
     expect(el.querySelector('.text-result')!.textContent).toBe('Meaning: x');
     expect(el.querySelector('[role=alert]')!.textContent).toContain('Ollama is not running.');
+  });
+
+  describe('custom actions', () => {
+    const simplify = { id: 7, name: 'Simplify (B2)', prompt: 'x {selection}' };
+
+    it('shows one button per action after the built-ins and runs it with its id and the selection', async () => {
+      actions.load.mockResolvedValue([simplify]);
+      llm.runAction.mockImplementation(async function* () {
+        yield 'Simple ';
+        yield 'text';
+      });
+      const { fixture, el, button } = create();
+      await settle(fixture);
+      expect(Array.from(el.querySelectorAll('.bar button')).map((b) => b.textContent!.trim())).toEqual([
+        'Translate', 'Explain', 'Simplify (B2)', 'Clear',
+      ]);
+      button('Simplify (B2)').click();
+      await settle(fixture);
+      expect(llm.runAction).toHaveBeenCalledWith(7, selection, expect.any(AbortSignal));
+      expect(el.querySelector('h2')!.textContent).toBe('Simplify (B2)');
+      expect(el.querySelector('.text-result')!.textContent).toBe('Simple text');
+    });
+
+    it('shows a stream error and disables the button while nothing is selected', async () => {
+      actions.load.mockResolvedValue([simplify]);
+      llm.runAction.mockImplementation(async function* () {
+        throw new Error('Ollama is not running.');
+      });
+      const empty = create(null);
+      await settle(empty.fixture);
+      expect(empty.button('Simplify (B2)').disabled).toBe(true);
+
+      const { fixture, el, button } = create();
+      await settle(fixture);
+      button('Simplify (B2)').click();
+      await settle(fixture);
+      expect(el.querySelector('[role=alert]')!.textContent).toContain('Ollama is not running.');
+    });
+
+    it('still works with the built-in actions when the list cannot be loaded', async () => {
+      actions.load.mockRejectedValue(new Error('down'));
+      const { fixture, el } = create();
+      await settle(fixture);
+      expect(el.querySelectorAll('.bar button').length).toBe(3);
+    });
   });
 
   it('disables Explain while nothing is selected', () => {

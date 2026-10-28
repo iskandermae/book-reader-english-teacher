@@ -51,3 +51,18 @@ describe.each([
     expect(await collect(abort.signal)).toEqual([]);
   });
 });
+
+describe('LlmService.runAction', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('posts to the action id with the selection and streams the chunks', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(sse('data: "Hi"\n\n', 'event: done\ndata: \n\n'));
+    vi.stubGlobal('fetch', fetchMock);
+    const chunks: string[] = [];
+    for await (const c of new LlmService().runAction(7, { text: 'a', context: 'b', paragraph: 'c' }, new AbortController().signal)) chunks.push(c);
+    expect(chunks).toEqual(['Hi']);
+    const request: Request = fetchMock.mock.calls[0][0];
+    expect(new URL(request.url).pathname).toBe('/api/llm/actions/7');
+    expect(await request.json()).toEqual({ text: 'a', context: 'b', paragraph: 'c' });
+  });
+});

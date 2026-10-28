@@ -1,9 +1,9 @@
 import { Injectable } from '@angular/core';
-import { postApiLlmExplain, postApiLlmTranslate } from '../api';
+import { postApiLlmActionsById, postApiLlmExplain, postApiLlmTranslate } from '../api';
 import { TextSelection } from './capture-selection';
 
 /** The generated SSE endpoints share one request/response shape; this is what the helper needs from them. */
-type StreamingCall = typeof postApiLlmTranslate | typeof postApiLlmExplain;
+type StreamingCall = typeof postApiLlmTranslate;
 
 /** Thin wrapper over the generated client so components can be tested without HTTP. */
 @Injectable({ providedIn: 'root' })
@@ -16,6 +16,12 @@ export class LlmService {
   /** Streams a simple-English explanation of the selection in its sentence and paragraph. */
   explain(selection: TextSelection, signal: AbortSignal): AsyncGenerator<string> {
     return this.stream(postApiLlmExplain, selection, signal);
+  }
+
+  /** Streams the answer of a custom action (its saved prompt) for the selection. */
+  runAction(id: number, selection: TextSelection, signal: AbortSignal): AsyncGenerator<string> {
+    // Same body and response as Translate; only the URL carries the id.
+    return this.stream((options) => postApiLlmActionsById({ ...options, path: { id } }), selection, signal);
   }
 
   /**

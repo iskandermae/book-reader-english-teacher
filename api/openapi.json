@@ -10,6 +10,132 @@
     }
   ],
   "paths": {
+    "/api/actions": {
+      "get": {
+        "tags": [
+          "Actions"
+        ],
+        "summary": "Lists the custom actions in saved order. A new database starts with one action, \"Simplify (B2)\".",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CustomActionDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CustomActionDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CustomActionDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Actions"
+        ],
+        "summary": "Replaces the whole list of custom actions (all or nothing) and returns it with the assigned ids. Actions missing from the request are deleted; the request order is the saved order.",
+        "requestBody": {
+          "description": "The new list: at most 20 actions; unique names (ignoring case); each prompt must contain {selection} and only known placeholders.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/CustomActionInput"
+                }
+              }
+            },
+            "text/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/CustomActionInput"
+                }
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/CustomActionInput"
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CustomActionDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CustomActionDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CustomActionDto"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The list is invalid; the detail field explains what to fix. Nothing is saved.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/books": {
       "get": {
         "tags": [
@@ -809,6 +935,90 @@
         }
       }
     },
+    "/api/llm/actions/{id}": {
+      "post": {
+        "tags": [
+          "Llm"
+        ],
+        "summary": "Runs a custom action: its saved prompt template is filled like the Translate and Explain templates and the answer is streamed.\r\nThe stream format is the same as in the test endpoint.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Id of the action (from the actions list).",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Cancels the request.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActionRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActionRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Blank text, no model chosen in settings, or the chosen model is not installed.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No action with this id.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Ollama is not reachable; the detail field says how to fix it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/scratchpad": {
       "get": {
         "tags": [
@@ -1076,6 +1286,33 @@
   },
   "components": {
     "schemas": {
+      "ActionRequest": {
+        "required": [
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "The selected text. Required."
+          },
+          "context": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The sentence around the selection (placeholder `{sentence}`). Optional."
+          },
+          "paragraph": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The paragraph around the selection (placeholder `{paragraph}`). Optional."
+          }
+        },
+        "description": "Request of the run-action endpoint."
+      },
       "BookChaptersResponse": {
         "required": [
           "bookId",
@@ -1228,6 +1465,54 @@
           }
         },
         "description": "A chapter in a book's chapter list."
+      },
+      "CustomActionDto": {
+        "required": [
+          "id",
+          "name",
+          "prompt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "name": {
+            "type": "string"
+          },
+          "prompt": {
+            "type": "string"
+          }
+        }
+      },
+      "CustomActionInput": {
+        "required": [
+          "name",
+          "prompt"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
       },
       "ExplainRequest": {
         "required": [
@@ -1470,6 +1755,9 @@
     }
   },
   "tags": [
+    {
+      "name": "Actions"
+    },
     {
       "name": "Books"
     },

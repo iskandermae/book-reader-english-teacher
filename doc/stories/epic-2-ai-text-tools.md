@@ -104,12 +104,19 @@ Decided with the user (2026-10-28): the template controls the whole prompt inclu
 - Out of scope: custom actions (S2.6b), model/URL/level UI (S2.6c), caching (S2.7).
 **Risks**: user can break the output format (accepted; Reset to default). Sentence split is a simple regex (existing).
 
-## S2.6b Custom actions (backend + frontend) — Story — TODO
-Depends on S2.6a.
-**Acceptance (high level)**
-- User creates 1-20 actions: name + prompt template (same placeholders as S2.6a). Each appears as a button in the action bar; the program builds the prompt, runs it, streams the result into the result panel (same streaming/errors as S2.3).
-- Managed in the "Prompts" tab.
-- A default action "Simplify (B2)" is seeded (replaces S2.5).
+## S2.6b Custom actions (backend + frontend) — Story — DONE
+Depends on S2.6a. Decided with the user: the seeded action is a normal action (edit/delete, no restore); buttons = built-ins first, then custom in saved order (no reorder UI); result is plain text as is.
+**Acceptance**
+- Backend (first): custom actions stored in SQLite (`id`, `name`, `prompt`, `position`) in the `data` folder. `GET /api/actions` returns the list in order. `PUT /api/actions` replaces the whole list (`[{ id?, name, prompt }]`, ids assigned by the server) in one transaction; nothing saved on any error.
+- Validation (400 with a clear message): 0-20 actions; name 1-40 chars after trim and unique (case-insensitive); prompt max 4000 chars, contains `{selection}`, no unknown placeholders (reuse the S2.6a validator and placeholders).
+- Seeding: on first start (flag stored in the database) one action "Simplify (B2)" is created. Deleting it is final; the flag prevents re-seeding. Prompt: rewrite `{selection}` in simple English at about B2 level, keep the meaning, use `{sentence}` as context only, output only the rewritten text.
+- `POST /api/llm/actions/{id}` `{ text, context, paragraph? }` streams SSE with the same validation and error mapping as Translate/Explain (empty `text` -> 400, empty model -> 400, Ollama down -> 503 with hint; unknown id -> 404). Reuse the shared endpoint code from S2.3/S2.4.
+- `api/openapi.json` and the generated client updated. Unit tests with the fake provider (list, replace, validation each rule, seeding once, run action uses its template, 404, error mapping); no network.
+- Frontend: Settings > Prompts tab gets a "Custom actions" section: list with name + prompt textarea, Add, Delete, shown with the placeholder list; saved with the existing Save button (replace-all). Failed load/save shows a message. Add is disabled at 20.
+- Frontend: the workspace action bar shows Translate, Explain, then one button per custom action (names as text, same enabled/disabled rule, bar wraps). A click runs the action; the result panel title is the action name; same stream, error, Clear, cancel behavior. Works in the reader and on the Text page. The bar reloads the action list when the page opens (no live sync between tabs).
+- Frontend tests (service mocked): Prompts tab (load, add, edit, delete, save, error, limit 20); action bar shows custom buttons; click calls the service with the action id and `{ text, context, paragraph }`; streamed chunks and error.
+- Out of scope: reorder UI, per-action model, Markdown rendering, English level (S2.6c), caching (S2.7), "restore seeded action".
+**Risks**: user can break an action's output format (accepted). Renaming/deleting an action while a result is shown does not affect the shown result.
 
 ## S2.6c General AI settings — Story — TODO
 Depends on S2.6a.

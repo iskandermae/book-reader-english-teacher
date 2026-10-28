@@ -17,6 +17,39 @@ namespace BookReader.Api.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.13");
 
+            modelBuilder.Entity("BookReader.Core.Actions.CustomAction", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Prompt")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("CustomActions");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Name = "Simplify (B2)",
+                            Position = 0,
+                            Prompt = "Rewrite the text below in simple English at about B2 level. Keep the meaning. Use the sentence only as context; do not rewrite it. Output only the rewritten text.\n\nText: {selection}\nContext sentence (may be empty): {sentence}"
+                        });
+                });
+
             modelBuilder.Entity("BookReader.Core.Books.Book", b =>
                 {
                     b.Property<int>("Id")

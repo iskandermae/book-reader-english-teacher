@@ -1,5 +1,6 @@
 using System.Text.Json;
 using BookReader.Api.Filters;
+using BookReader.Core.Actions;
 using BookReader.Core.Llm;
 using BookReader.Core.Settings;
 using Microsoft.AspNetCore.Mvc;
@@ -9,7 +10,7 @@ namespace BookReader.Api.Controllers;
 [ApiController]
 [Route("api/llm")]
 [ServiceFilter<LlmExceptionFilter>]
-public class LlmController(ILlmProvider llm, ISettingsService settings) : ControllerBase
+public class LlmController(ILlmProvider llm, ISettingsService settings, ICustomActionService actions) : ControllerBase
 {
     /// <summary>Checks whether the LLM server (Ollama) is reachable. Always returns 200; a problem is reported in the error field.</summary>
     [HttpGet("status")]
@@ -58,7 +59,7 @@ public class LlmController(ILlmProvider llm, ISettingsService settings) : Contro
         if (IsBlankText(request.Text, out var invalid))
             return invalid;
 
-        return await StreamAsync(await BuildPromptAsync(SettingsService.PromptTranslate, request.Text, request.Context, request.Paragraph, ct), ct);
+        return await StreamAsync(await BuildPromptAsync(all => all[SettingsService.PromptTranslate], request.Text, request.Context, request.Paragraph, ct), ct);
     }
 
     /// <summary>
@@ -76,17 +77,45 @@ public class LlmController(ILlmProvider llm, ISettingsService settings) : Contro
         if (IsBlankText(request.Text, out var invalid))
             return invalid;
 
-        return await StreamAsync(await BuildPromptAsync(SettingsService.PromptExplain, request.Text, request.Context, request.Paragraph, ct), ct);
+        return await StreamAsync(await BuildPromptAsync(all => all[SettingsService.PromptExplain], request.Text, request.Context, request.Paragraph, ct), ct);
     }
 
-    // Reads the saved template and languages on every call, so a settings change applies without restart.
-    private async Task<string> BuildPromptAsync(string templateKey, string text, string? sentence, string? paragraph, CancellationToken ct)
+    /// <summary>
+    /// Runs a custom action: its saved prompt template is filled like the Translate and Explain templates and the answer is streamed.
+    /// The stream format is the same as in the test endpoint.
+    /// </summary>
+    /// <param name="id">Id of the action (from the actions list).</param>
+    /// <param name="request">The selection and its context.</param>
+    /// <param name="ct">Cancels the request.</param>
+    /// <response code="400">Blank text, no model chosen in settings, or the chosen model is not installed.</response>
+    /// <response code="404">No action with this id.</response>
+    /// <response code="503">Ollama is not reachable; the detail field says how to fix it.</response>
+    [HttpPost("actions/{id:int}")]
+    [ProducesResponseType<string>(StatusCodes.Status200OK, "text/event-stream")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound, "application/problem+json")]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status503ServiceUnavailable, "application/problem+json")]
+    public async Task<IActionResult> RunAction(int id, [FromBody] ActionRequest request, CancellationToken ct)
+    {
+        if (IsBlankText(request.Text, out var invalid))
+            return invalid;
+
+        var action = await actions.GetAsync(id, ct);
+        if (action is null)
+            return NotFound(new ProblemDetails { Title = "Action not found", Detail = $"There is no action with id {id}." });
+
+        return await StreamAsync(await BuildPromptAsync(_ => action.Prompt, request.Text, request.Context, request.Paragraph, ct), ct);
+    }
+
+    // Reads the template and languages on every call, so a settings change applies without restart.
+    private async Task<string> BuildPromptAsync(Func<IReadOnlyDictionary<string, string>, string> template,
+        string text, string? sentence, string? paragraph, CancellationToken ct)
     {
         var all = await settings.GetAllAsync(ct);
         if (string.IsNullOrWhiteSpace(all[SettingsService.LanguageNative]))
             throw new LlmNotConfiguredException("Set your native language in settings.");
 
-        return PromptTemplate.Fill(all[templateKey],
+        return PromptTemplate.Fill(template(all),
             new PromptValues(text, sentence, paragraph, all[SettingsService.LanguageNative], all[SettingsService.LanguageFrom]));
     }
 
@@ -146,3 +175,9 @@ public record TranslateRequest(string Text, string? Context = null, string? Para
 /// <param name="Context">The sentence around the selection (placeholder <c>{sentence}</c>). Optional.</param>
 /// <param name="Paragraph">The paragraph around the selection (placeholder <c>{paragraph}</c>). Optional.</param>
 public record ExplainRequest(string Text, string? Context = null, string? Paragraph = null);
+
+/// <summary>Request of the run-action endpoint.</summary>
+/// <param name="Text">The selected text. Required.</param>
+/// <param name="Context">The sentence around the selection (placeholder <c>{sentence}</c>). Optional.</param>
+/// <param name="Paragraph">The paragraph around the selection (placeholder <c>{paragraph}</c>). Optional.</param>
+public record ActionRequest(string Text, string? Context = null, string? Paragraph = null);

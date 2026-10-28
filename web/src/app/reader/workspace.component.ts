@@ -1,10 +1,13 @@
-import { Component, computed, DestroyRef, effect, ElementRef, inject, input, signal } from '@angular/core';
+import { Component, computed, DestroyRef, effect, ElementRef, inject, input, OnInit, signal } from '@angular/core';
 import { AppearanceService, PANEL_WIDTH } from '../appearance/appearance.service';
+import { ActionsService, CustomAction } from '../settings/actions.service';
 import { TextSelection } from './capture-selection';
 import { LlmService } from './llm.service';
 
 const PREVIEW_CHARS = 120;
 const KEY_STEP = 2; // percent per arrow press
+
+type StreamStarter = (selection: TextSelection, signal: AbortSignal) => AsyncGenerator<string>;
 
 /**
  * Split view: the text (projected content) on the left, the AI result panel on the right.
@@ -23,7 +26,7 @@ const KEY_STEP = 2; // percent per arrow press
             scrollbar-gutter: stable; box-sizing: border-box; padding: 0.5rem 1rem 0.5rem 0.5rem; }
     [role=separator] { align-self: stretch; width: 0.4rem; cursor: col-resize; background: GrayText; opacity: 0.4; touch-action: none; }
     [role=separator]:hover, [role=separator]:focus { opacity: 1; }
-    .bar { display: flex; gap: 0.5rem; align-items: center; }
+    .bar { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
     .preview, .text-result { white-space: pre-wrap; overflow-wrap: anywhere; }
     .preview { opacity: 0.7; }
     @media (max-width: 800px) {
@@ -41,14 +44,18 @@ const KEY_STEP = 2; // percent per arrow press
     <aside [style.width.%]="width()" aria-label="AI tools">
       <!-- mousedown is prevented so clicking an action does not clear the text selection -->
       <div class="bar" role="toolbar" aria-label="Selection tools" (mousedown)="$event.preventDefault()">
-        <button type="button" [disabled]="!kept()" (click)="run('translate')">Translate</button>
-        <button type="button" [disabled]="!kept()" (click)="run('explain')">Explain</button>
+        <button type="button" [disabled]="!kept()" (click)="run('Translate', translate)">Translate</button>
+        <button type="button" [disabled]="!kept()" (click)="run('Explain', explain)">Explain</button>
+        @for (action of actions(); track action.id) {
+          <button type="button" [disabled]="!kept()" (click)="run(action.name, runCustom(action))">{{ action.name }}</button>
+        }
         <button type="button" [disabled]="!result()" (click)="clear()">Clear</button>
       </div>
       @if (preview(); as text) {
         <p class="preview">{{ text }}</p>
       }
       @if (result(); as r) {
+        <h2>{{ r.title }}</h2>
         @if (r.loading && !r.text && !r.error) {
           <p>Working...</p>
         }
@@ -60,13 +67,14 @@ const KEY_STEP = 2; // percent per arrow press
     </aside>
   `,
 })
-export class WorkspaceComponent {
+export class WorkspaceComponent implements OnInit {
   /** The live selection of the text source; null when nothing usable is selected (it does not clear the panel). */
   readonly selection = input<TextSelection | null>(null);
   /** When this value changes the running request is cancelled and the result is cleared. */
   readonly resetKey = input<unknown>();
 
   private readonly llm = inject(LlmService);
+  private readonly actionsService = inject(ActionsService);
   private readonly appearance = inject(AppearanceService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
 
@@ -76,8 +84,10 @@ export class WorkspaceComponent {
   private readonly dragWidth = signal<number | null>(null);
   protected readonly width = computed(() => this.dragWidth() ?? this.appearance.panelWidth());
 
-  protected readonly result = signal<{ text: string; error: string; loading: boolean } | null>(null);
+  protected readonly result = signal<{ title: string; text: string; error: string; loading: boolean } | null>(null);
   private request: AbortController | null = null;
+  /** The custom actions, loaded when the page opens (no live sync with the Settings page). */
+  protected readonly actions = signal<CustomAction[]>([]);
 
   // The last non-empty selection. Clearing the selection in the text keeps it, so actions still work on it.
   protected readonly kept = signal<TextSelection | null>(null);
@@ -101,14 +111,29 @@ export class WorkspaceComponent {
     inject(DestroyRef).onDestroy(() => this.request?.abort());
   }
 
-  protected async run(action: 'translate' | 'explain'): Promise<void> {
+  async ngOnInit(): Promise<void> {
+    try {
+      this.actions.set(await this.actionsService.load());
+    } catch {
+      // The built-in actions keep working without the custom ones.
+    }
+  }
+
+  protected readonly translate = (s: TextSelection, signal: AbortSignal) => this.llm.translate(s, signal);
+  protected readonly explain = (s: TextSelection, signal: AbortSignal) => this.llm.explain(s, signal);
+  protected runCustom(action: CustomAction): StreamStarter {
+    return (s, signal) => this.llm.runAction(action.id!, s, signal);
+  }
+
+  /** Runs one action; `title` heads the result panel. */
+  protected async run(title: string, start: StreamStarter): Promise<void> {
     const selected = this.kept();
     if (!selected) return;
     this.request?.abort(); // a new request replaces the running one
     const request = (this.request = new AbortController());
-    this.result.set({ text: '', error: '', loading: true });
+    this.result.set({ title, text: '', error: '', loading: true });
     try {
-      for await (const chunk of this.llm[action](selected, request.signal)) {
+      for await (const chunk of start(selected, request.signal)) {
         // A replaced or cleared request must not write into a newer result.
         if (this.request !== request) break;
         this.result.update((r) => r && { ...r, text: r.text + chunk, loading: false });
