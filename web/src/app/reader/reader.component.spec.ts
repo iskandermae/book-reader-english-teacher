@@ -27,6 +27,13 @@ class FakeObserver {
 }
 
 describe('ReaderComponent', () => {
+  // Failures are logged on purpose; keep the test output clean and let tests assert on it.
+  let consoleError: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  });
+  afterEach(() => consoleError.mockRestore());
+
   type Mock = ReturnType<typeof vi.fn>;
   let api: { chapters: Mock; chapter: Mock; position: Mock; savePosition: Mock };
   let settings: { load: Mock; save: Mock };
@@ -128,7 +135,8 @@ describe('ReaderComponent', () => {
   it('shows an error when the chapter does not exist', async () => {
     api.chapter.mockRejectedValue(new Error('404'));
     const { el } = await open('/books/5?chapter=99');
-    expect(el.querySelector('[role=alert]')!.textContent).toContain('Could not load');
+    expect(el.querySelector('[role=alert]')!.textContent).toContain('404');
+    expect(consoleError).toHaveBeenCalled();
   });
 
   it('keeps the title and chapter list visible while the next chapter loads', async () => {
@@ -152,7 +160,7 @@ describe('ReaderComponent', () => {
   it('shows an error with a link back when the book is not found', async () => {
     api.chapters.mockRejectedValue(new Error('404'));
     const { el } = await open('/books/99');
-    expect(el.querySelector('[role=alert]')!.textContent).toContain('Could not load');
+    expect(el.querySelector('[role=alert]')!.textContent).toContain('404');
     expect(el.querySelector('a')!.getAttribute('href')).toBe('/');
   });
 
@@ -198,7 +206,8 @@ describe('ReaderComponent', () => {
       settings.save.mockRejectedValue(new Error('offline'));
       const { harness, el } = await open('/books/5?chapter=0');
       await choose(harness, 'reader.width', 'narrow');
-      expect(el.querySelector('[role=alert]')!.textContent).toContain('Could not save');
+      expect(el.querySelector('[role=alert]')!.textContent).toContain('offline');
+      expect(consoleError).toHaveBeenCalled();
     });
   });
 
@@ -235,18 +244,21 @@ describe('ReaderComponent', () => {
       expect(api.savePosition).toHaveBeenCalledWith(5, { chapterIndex: 1, paragraphIndex: 0 });
     });
 
-    it('falls back to the top of chapter 0 without an error when the saved position is invalid', async () => {
+    it('falls back to the top of chapter 0 with a message when the saved position is invalid', async () => {
       api.position.mockResolvedValue({ chapterIndex: 9, paragraphIndex: 0 });
       api.chapter.mockImplementation((_id: number, index: number) =>
         index === 9 ? Promise.reject(new Error('404')) : Promise.resolve({ title: `Chapter ${index}`, paragraphs: ['a'] }));
       const { el } = await open('/books/5');
-      expect(el.querySelector('[role=alert]')).toBeNull();
+      expect(el.querySelector('[role=alert]')!.textContent).toContain('404');
+      expect(consoleError).toHaveBeenCalled();
       expect(el.querySelector('h2')!.textContent).toBe('Chapter 0');
     });
 
     it('falls back to chapter 0 when the position cannot be read', async () => {
       api.position.mockRejectedValue(new Error('404'));
       const { el } = await open('/books/5');
+      expect(el.querySelector('[role=alert]')!.textContent).toContain('404');
+      expect(consoleError).toHaveBeenCalled();
       expect(el.querySelector('h2')!.textContent).toBe('Chapter 0');
     });
 
@@ -295,10 +307,13 @@ describe('ReaderComponent', () => {
       expect(api.savePosition).toHaveBeenCalledWith(5, { chapterIndex: 0, paragraphIndex: 1 });
     });
 
-    it('ignores a failed save', async () => {
+    it('shows a message and keeps the book readable when a save fails', async () => {
       api.savePosition.mockRejectedValue(new Error('offline'));
-      const { el } = await open('/books/5?chapter=1');
-      expect(el.querySelector('[role=alert]')).toBeNull();
+      const { harness, el } = await open('/books/5?chapter=1');
+      await settle(harness);
+      expect(el.querySelector('[role=alert]')!.textContent).toContain('offline');
+      expect(el.querySelector('h2')!.textContent).toBe('Chapter 1');
+      expect(consoleError).toHaveBeenCalled();
     });
   });
 

@@ -6,6 +6,7 @@ import { APPEARANCE_OPTIONS, AppearanceKey, AppearanceService } from '../appeara
 import { captureSelection, TextSelection } from './capture-selection';
 import { WorkspaceComponent } from './workspace.component';
 import { BookChapters, Chapter, ReaderService, ReadingPosition } from './reader.service';
+import { reportError } from '../report-error';
 
 const SAVE_DELAY_MS = 1000;
 const SELECTION_DELAY_MS = 150;
@@ -48,6 +49,9 @@ const SELECTION_DELAY_MS = 150;
           </label>
         }
       </fieldset>
+      @if (positionError()) {
+        <p role="alert">{{ positionError() }}</p>
+      }
       @if (appearance.saveError()) {
         <p role="alert">{{ appearance.saveError() }}</p>
       }
@@ -113,6 +117,7 @@ export class ReaderComponent {
   protected readonly book = signal<BookChapters | null>(null);
   protected readonly chapter = signal<Chapter | null>(null);
   protected readonly error = signal('');
+  protected readonly positionError = signal(''); // a failed save of the reading position; the book stays readable
   protected readonly lastIndex = computed(() => (this.book()?.chapters.length ?? 1) - 1);
   // Closed by default on narrow screens (matchMedia is missing in some test environments).
   protected readonly panelOpen = signal(window.matchMedia?.('(min-width: 800px)').matches ?? true);
@@ -189,7 +194,10 @@ export class ReaderComponent {
       let start: ReadingPosition = { chapterIndex: requested ?? 0, paragraphIndex: 0 };
       let resuming = false;
       if (requested === null) {
-        start = await this.api.position(bookId).catch(() => start);
+        start = await this.api.position(bookId).catch((e) => {
+          this.positionError.set(reportError('Could not restore your reading position; starting from the beginning.', e));
+          return start;
+        });
         if (token !== this.loadToken) return;
         resuming = true;
       }
@@ -198,6 +206,7 @@ export class ReaderComponent {
         chapter = await this.api.chapter(bookId, start.chapterIndex);
       } catch (e) {
         if (!resuming || start.chapterIndex === 0) throw e;
+        this.positionError.set(reportError('Could not restore your reading position; starting from the beginning.', e));
         start = { chapterIndex: 0, paragraphIndex: 0 };
         chapter = await this.api.chapter(bookId, 0);
       }
@@ -213,10 +222,10 @@ export class ReaderComponent {
         },
         { injector: this.injector },
       );
-    } catch {
+    } catch (e) {
       if (token !== this.loadToken) return;
       this.loadedBookId = null;
-      this.error.set('Could not load this book or chapter.');
+      this.error.set(reportError('Could not load this book or chapter.', e));
     }
   }
 
@@ -271,10 +280,13 @@ export class ReaderComponent {
   private save(bookId: number, position: ReadingPosition): void {
     const last = this.lastSaved;
     if (last && last.chapterIndex === position.chapterIndex && last.paragraphIndex === position.paragraphIndex) return;
-    // A failed save is silent; the next position change tries again.
+    // A failed save is shown; the next position change tries again.
     this.api.savePosition(bookId, position).then(
-      () => (this.lastSaved = position),
-      () => undefined,
+      () => {
+        this.lastSaved = position;
+        this.positionError.set('');
+      },
+      (e) => this.positionError.set(reportError('Could not save your reading position.', e)),
     );
   }
 }

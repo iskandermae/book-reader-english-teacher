@@ -17,6 +17,7 @@ Do not run tests, builds, or any code, manual or automated, and do not copy the 
 - Read the story file, the acceptance criteria, and the actual diff (`git diff`, `git status`).
 - Check that there are no unexpected changes.
 - Check app requirements: data in a `data` folder beside the executable, no required cloud dependency, no secrets in the frontend or in git.
+- Check for hidden errors: frontend with an empty `catch` or silent fallback (must show a message and call `console.error`); backend failures and important actions not logged.
 
 ## Rules
 - Report existing unrelated problems separately. Do not fix them.

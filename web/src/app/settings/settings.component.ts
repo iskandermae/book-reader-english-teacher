@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ActionsService, CustomAction } from './actions.service';
 import { SettingsMap, SettingsService } from './settings.service';
+import { reportError } from '../report-error';
 
 /** The editable built-in prompts (setting key and label). */
 const PROMPTS = [
@@ -82,8 +83,8 @@ export class SettingsComponent implements OnInit {
       this.show(map);
       this.actions.set(actions);
       this.loaded.set(true);
-    } catch {
-      this.report('Could not load settings.', true);
+    } catch (e) {
+      this.report(reportError('Could not load settings.', e), true);
     }
   }
 
@@ -93,7 +94,7 @@ export class SettingsComponent implements OnInit {
       this.actions.set(await this.actionsService.save(this.actions())); // replaces the list; returns the assigned ids
       this.report('Settings saved.', false);
     } catch (e) {
-      this.report(e instanceof Error ? e.message : 'Could not save settings.', true);
+      this.report(reportError('Could not save settings.', e), true);
     }
   }
 
@@ -102,8 +103,8 @@ export class SettingsComponent implements OnInit {
     try {
       this.update(key, (await this.settings.loadDefaults())[key]);
       this.report('Default restored. Press Save to keep it.', false);
-    } catch {
-      this.report('Could not load the default prompt.', true);
+    } catch (e) {
+      this.report(reportError('Could not load the default prompt.', e), true);
     }
   }
 

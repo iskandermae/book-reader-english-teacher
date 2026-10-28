@@ -3,6 +3,7 @@ import { AppearanceService, PANEL_WIDTH } from '../appearance/appearance.service
 import { ActionsService, CustomAction } from '../settings/actions.service';
 import { TextSelection } from './capture-selection';
 import { LlmService } from './llm.service';
+import { reportError } from '../report-error';
 
 const PREVIEW_CHARS = 120;
 const KEY_STEP = 2; // percent per arrow press
@@ -51,6 +52,9 @@ type StreamStarter = (selection: TextSelection, signal: AbortSignal) => AsyncGen
         }
         <button type="button" [disabled]="!result()" (click)="clear()">Clear</button>
       </div>
+      @if (actionsError()) {
+        <p role="alert">{{ actionsError() }}</p>
+      }
       @if (preview(); as text) {
         <p class="preview">{{ text }}</p>
       }
@@ -88,6 +92,7 @@ export class WorkspaceComponent implements OnInit {
   private request: AbortController | null = null;
   /** The custom actions, loaded when the page opens (no live sync with the Settings page). */
   protected readonly actions = signal<CustomAction[]>([]);
+  protected readonly actionsError = signal('');
 
   // The last non-empty selection. Clearing the selection in the text keeps it, so actions still work on it.
   protected readonly kept = signal<TextSelection | null>(null);
@@ -114,8 +119,9 @@ export class WorkspaceComponent implements OnInit {
   async ngOnInit(): Promise<void> {
     try {
       this.actions.set(await this.actionsService.load());
-    } catch {
+    } catch (e) {
       // The built-in actions keep working without the custom ones.
+      this.actionsError.set(reportError('Could not load your custom actions.', e));
     }
   }
 
@@ -140,7 +146,7 @@ export class WorkspaceComponent implements OnInit {
       }
     } catch (e) {
       if (!request.signal.aborted) {
-        this.result.update((r) => r && { ...r, error: e instanceof Error ? e.message : 'The AI request failed.' });
+        this.result.update((r) => r && { ...r, error: reportError('The AI request failed.', e) });
       }
     } finally {
       if (this.request === request) this.result.update((r) => r && { ...r, loading: false });

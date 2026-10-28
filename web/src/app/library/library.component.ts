@@ -3,6 +3,7 @@ import { Component, ElementRef, inject, OnInit, signal, viewChild } from '@angul
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { BookSummary, BooksService } from './books.service';
+import { reportError } from '../report-error';
 
 @Component({
   selector: 'app-library',
@@ -94,7 +95,8 @@ export class LibraryComponent implements OnInit {
         // Re-prefill only if the user has not edited the title in the meantime.
         this.setFiles(orderByNames(picked, sortedNames), this.title === prefill);
       }
-    } catch {
+    } catch (e) {
+      console.error('Could not sort the files.', e);
       if (this.files() === picked) {
         // Keep the picked order: the server sorts on import anyway.
         this.sortError.set('Could not sort the files; the server will sort them on import.');
@@ -125,7 +127,7 @@ export class LibraryComponent implements OnInit {
       this.resetFileInput();
       await this.refresh();
     } catch (e) {
-      this.importError.set((e as Error).message);
+      this.importError.set(reportError('Could not import the book.', e));
     } finally {
       this.uploading.set(false);
     }
@@ -137,7 +139,7 @@ export class LibraryComponent implements OnInit {
       await this.booksApi.delete(book.id);
       this.books.update((list) => list.filter((b) => b.id !== book.id));
     } catch (e) {
-      this.deleteError.set((e as Error).message);
+      this.deleteError.set(reportError('Could not delete the book.', e));
     } finally {
       this.confirmingId.set(null);
     }
@@ -147,8 +149,8 @@ export class LibraryComponent implements OnInit {
     try {
       this.books.set(await this.booksApi.list());
       this.loadError.set('');
-    } catch {
-      this.loadError.set('Could not load the library.');
+    } catch (e) {
+      this.loadError.set(reportError('Could not load the library.', e));
     } finally {
       this.loading.set(false);
     }

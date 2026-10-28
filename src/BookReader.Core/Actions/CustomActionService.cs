@@ -2,6 +2,7 @@ using BookReader.Core.Data;
 using BookReader.Core.Llm;
 using BookReader.Core.Settings;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace BookReader.Core.Actions;
 
@@ -33,7 +34,7 @@ public interface ICustomActionService
     Task<IReadOnlyList<CustomActionDto>> ReplaceAsync(IReadOnlyList<CustomActionInput> actions, CancellationToken ct = default);
 }
 
-public class CustomActionService(AppDbContext db) : ICustomActionService
+public class CustomActionService(AppDbContext db, ILogger<CustomActionService> logger) : ICustomActionService
 {
     public const int MaxActions = 20;
     public const int MaxNameLength = 40;
@@ -72,7 +73,9 @@ public class CustomActionService(AppDbContext db) : ICustomActionService
         db.CustomActions.RemoveRange(existing.Values.Where(a => !kept.Contains(a.Id)));
         await db.SaveChangesAsync(ct);
 
-        return await ListAsync(ct);
+        var result = await ListAsync(ct);
+        logger.LogInformation("Custom actions saved: {Count}", result.Count);
+        return result;
     }
 
     // Collects every problem so the user can fix them in one go; nothing is saved if any exists.

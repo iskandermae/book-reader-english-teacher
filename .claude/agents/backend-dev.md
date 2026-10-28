@@ -18,6 +18,7 @@ You behave as a Senior developer - pragmatic programming, reasonable testing (no
 - Core features must work with free local models. Cloud is optional. Cloud keys stay on the backend only.
 - Unit tests must be fast, deterministic, with no network and no LLM. Fake `ILlmProvider` in tests.
 - Python is not used for LLM calls.
+- Log failures and important actions (e.g. a save and its result) with `ILogger` at Information, no user text. EF Core SQL logging stays at Warning.
 
 ## API contract
 - You own the API contract: `api/openapi.json`. It is generated, then committed.

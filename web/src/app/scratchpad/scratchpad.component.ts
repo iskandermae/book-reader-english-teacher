@@ -4,6 +4,7 @@ import { TextSelection } from '../reader/capture-selection';
 import { captureTextAreaSelection } from '../reader/capture-text-area';
 import { WorkspaceComponent } from '../reader/workspace.component';
 import { ScratchpadService } from './scratchpad.service';
+import { reportError } from '../report-error';
 
 export const SAVE_DELAY_MS = 1000;
 /** Same limit as the API (it rejects longer text). */
@@ -65,7 +66,7 @@ export class ScratchpadComponent implements OnInit {
       this.text.set(await this.api.load());
       this.loaded.set(true);
     } catch (e) {
-      this.error.set(e instanceof Error ? e.message : 'Could not load the text.');
+      this.error.set(reportError('Could not load the text.', e));
     }
   }
 
@@ -98,7 +99,7 @@ export class ScratchpadComponent implements OnInit {
     // A failed save is shown; the next edit saves the whole text again.
     this.saving = this.saving.then(() => this.api.save(this.text())).then(
       () => this.error.set(''),
-      (e) => this.error.set(e instanceof Error ? e.message : 'Could not save the text.'),
+      (e) => this.error.set(reportError('Could not save the text.', e)),
     );
   }
 }

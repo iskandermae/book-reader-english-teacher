@@ -39,11 +39,15 @@ export class LlmService {
         try {
           const response = await fetch(...args);
           if (!response.ok) {
-            const problem = await response.json().catch(() => null);
+            const problem = await response.json().catch((e) => {
+              console.error('The error response is not valid problem details.', e);
+              return null;
+            });
             requestError = problem?.detail ?? 'The AI request failed.';
           }
           return response;
         } catch (e) {
+          console.error('Could not reach the server.', e);
           requestError = 'Could not reach the server.';
           throw e;
         }

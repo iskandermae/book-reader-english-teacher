@@ -3,6 +3,13 @@ import { SettingsService } from '../settings/settings.service';
 import { AppearanceService } from './appearance.service';
 
 describe('AppearanceService', () => {
+  // Failures are logged on purpose; keep the test output clean and let tests assert on it.
+  let consoleError: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  });
+  afterEach(() => consoleError.mockRestore());
+
   const settings = { load: vi.fn(), save: vi.fn() };
 
   beforeEach(() => {
@@ -63,7 +70,17 @@ describe('AppearanceService', () => {
     const service = create();
     await service.set('reader.theme', 'dark');
     expect(service.values()['reader.theme']).toBe('dark');
-    expect(service.saveError()).toContain('Could not save');
+    expect(service.saveError()).toContain('boom');
+    expect(consoleError).toHaveBeenCalled();
+  });
+
+  it('shows a message and keeps the defaults when loading fails', async () => {
+    settings.load.mockRejectedValue({ detail: 'Settings file is corrupt.' }); // the shape the generated client throws
+    const service = create();
+    await service.load();
+    expect(service.values()['reader.theme']).toBe('light');
+    expect(service.saveError()).toContain('Settings file is corrupt.');
+    expect(consoleError).toHaveBeenCalled();
   });
 
   describe('panelWidth', () => {

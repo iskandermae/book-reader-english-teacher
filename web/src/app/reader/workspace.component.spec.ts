@@ -6,6 +6,13 @@ import { LlmService } from './llm.service';
 import { WorkspaceComponent } from './workspace.component';
 
 describe('WorkspaceComponent', () => {
+  // Failures are logged on purpose; keep the test output clean and let tests assert on it.
+  let consoleError: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  });
+  afterEach(() => consoleError.mockRestore());
+
   type Mock = ReturnType<typeof vi.fn>;
   let llm: { translate: Mock; explain: Mock; runAction: Mock };
   let actions: { load: Mock };
@@ -69,6 +76,21 @@ describe('WorkspaceComponent', () => {
     expect(llm.translate).not.toHaveBeenCalled();
     expect(el.querySelector('.text-result')!.textContent).toBe('Meaning: x');
     expect(el.querySelector('[role=alert]')!.textContent).toContain('Ollama is not running.');
+    expect(consoleError).toHaveBeenCalled();
+  });
+
+  it('shows a message when the custom actions cannot be loaded and keeps the built-in buttons working', async () => {
+    actions.load.mockRejectedValue({ detail: 'Database is locked.' });
+    llm.translate.mockImplementation(async function* () {
+      yield 'Hallo';
+    });
+    const { fixture, el, button } = create();
+    await settle(fixture);
+    expect(el.querySelector('[role=alert]')!.textContent).toContain('Database is locked.');
+    expect(consoleError).toHaveBeenCalled();
+    button('Translate').click();
+    await settle(fixture);
+    expect(el.querySelector('.text-result')!.textContent).toBe('Hallo');
   });
 
   describe('custom actions', () => {

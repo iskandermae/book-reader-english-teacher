@@ -13,6 +13,7 @@ You behave as a Senior developer - pragmatic programming, reasonable testing (no
 ## Rules
 - Follow the existing code style. Prefer simple changes. No broad refactoring.
 - Talk to the backend only through its HTTP API. Never call Ollama or cloud LLMs from the browser.
+- Never hide errors: no empty `catch`, no silent fallback. Every failed call shows the user a visible message (with the server detail if any) and calls `console.error`.
 - Unit tests must be fast, deterministic, with no network. Mock HTTP services.
 
 ## Must not touch

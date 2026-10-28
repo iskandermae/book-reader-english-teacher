@@ -12,6 +12,13 @@ const book = (id: number, lastOpenedAt: string | null = null): BookSummary => ({
 });
 
 describe('LibraryComponent', () => {
+  // Failures are logged on purpose; keep the test output clean and let tests assert on it.
+  let consoleError: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  });
+  afterEach(() => consoleError.mockRestore());
+
   async function settle(fixture: ComponentFixture<LibraryComponent>) {
     await fixture.whenStable();
     fixture.detectChanges();
@@ -58,7 +65,8 @@ describe('LibraryComponent', () => {
 
   it('shows an error when the list cannot be loaded', async () => {
     const { el } = await render({ list: () => Promise.reject(new Error('down')) });
-    expect(el.querySelector('[role=alert]')!.textContent).toContain('Could not load the library');
+    expect(el.querySelector('[role=alert]')!.textContent).toContain('down');
+    expect(consoleError).toHaveBeenCalled();
   });
 
   it('prefills the title from the file name and enables Import', async () => {

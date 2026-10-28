@@ -5,6 +5,13 @@ import { SettingsComponent } from './settings.component';
 import { SettingsService } from './settings.service';
 
 describe('SettingsComponent', () => {
+  // Failures are logged on purpose; keep the test output clean and let tests assert on it.
+  let consoleError: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  });
+  afterEach(() => consoleError.mockRestore());
+
   async function render(service: Partial<SettingsService>, actions: Partial<ActionsService> = { load: () => Promise.resolve([]), save: (list) => Promise.resolve(list) }) {
     TestBed.configureTestingModule({
       imports: [SettingsComponent],
@@ -53,7 +60,8 @@ describe('SettingsComponent', () => {
   it('shows a message and disables Save when loading fails', async () => {
     const fixture = await render({ load: () => Promise.reject(new Error('boom')) });
     const el = fixture.nativeElement as HTMLElement;
-    expect(el.querySelector('[role=alert]')!.textContent).toContain('Could not load settings');
+    expect(el.querySelector('[role=alert]')!.textContent).toContain('boom');
+    expect(consoleError).toHaveBeenCalled();
     expect(el.querySelector<HTMLButtonElement>('button[type=submit]')!.disabled).toBe(true);
   });
 
@@ -118,7 +126,8 @@ describe('SettingsComponent', () => {
       el.querySelectorAll<HTMLButtonElement>('button:not([role=tab]):not([type=submit])')[0].click();
       await fixture.whenStable();
       fixture.detectChanges();
-      expect(el.querySelector('[role=alert]')!.textContent).toContain('Could not load the default');
+      expect(el.querySelector('[role=alert]')!.textContent).toContain('down');
+      expect(consoleError).toHaveBeenCalled();
       expect(el.querySelector<HTMLTextAreaElement>('textarea[name="prompt.translate"]')!.value).toBe('T {selection}');
     });
 
@@ -202,7 +211,8 @@ describe('SettingsComponent', () => {
 
       it('shows a message when the actions cannot be loaded', async () => {
         const fixture = await render({ load: () => Promise.resolve(loaded) }, { load: () => Promise.reject(new Error('boom')) });
-        expect((fixture.nativeElement as HTMLElement).querySelector('[role=alert]')!.textContent).toContain('Could not load settings');
+        expect((fixture.nativeElement as HTMLElement).querySelector('[role=alert]')!.textContent).toContain('boom');
+        expect(consoleError).toHaveBeenCalled();
       });
     });
   });

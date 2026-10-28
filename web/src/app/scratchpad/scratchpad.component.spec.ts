@@ -5,6 +5,13 @@ import { SAVE_DELAY_MS, ScratchpadComponent } from './scratchpad.component';
 import { ScratchpadService } from './scratchpad.service';
 
 describe('ScratchpadComponent', () => {
+  // Failures are logged on purpose; keep the test output clean and let tests assert on it.
+  let consoleError: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  });
+  afterEach(() => consoleError.mockRestore());
+
   let service: { load: ReturnType<typeof vi.fn>; save: ReturnType<typeof vi.fn> };
 
   async function settle(fixture: ComponentFixture<ScratchpadComponent>) {
@@ -135,6 +142,7 @@ describe('ScratchpadComponent', () => {
     service.load.mockRejectedValue(new Error('down'));
     const { el, area } = await render();
     expect(el.querySelector('[role=alert]')!.textContent).toContain('down');
+    expect(consoleError).toHaveBeenCalled();
     expect(area.disabled).toBe(true);
   });
 });

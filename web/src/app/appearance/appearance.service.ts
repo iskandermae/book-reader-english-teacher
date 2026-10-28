@@ -1,5 +1,6 @@
 import { effect, Injectable, inject, signal } from '@angular/core';
 import { SettingsService } from '../settings/settings.service';
+import { reportError } from '../report-error';
 
 /** Allowed values per setting key (mirrors the backend validation, S1.7); the first one is the default. */
 export const APPEARANCE_OPTIONS = {
@@ -28,7 +29,7 @@ export class AppearanceService {
   private readonly settings = inject(SettingsService);
 
   readonly values = signal<Record<AppearanceKey, string>>(defaults());
-  /** Non-empty when the last save failed; the new look stays for the session. */
+  /** Non-empty when the last load or save failed; the new look stays for the session. */
   readonly saveError = signal('');
   readonly panelWidth = signal<number>(PANEL_WIDTH.default);
 
@@ -47,8 +48,9 @@ export class AppearanceService {
       this.values.set(next);
       const width = Number(saved[PANEL_WIDTH.key]);
       if (Number.isInteger(width) && width >= PANEL_WIDTH.min && width <= PANEL_WIDTH.max) this.panelWidth.set(width);
-    } catch {
-      // Defaults stay; the reader still works.
+    } catch (e) {
+      // Defaults stay; the reader still works, and the reader page shows this message.
+      this.saveError.set(reportError('Could not load your appearance settings. Defaults are used.', e));
     }
   }
 
@@ -58,8 +60,8 @@ export class AppearanceService {
     this.saveError.set('');
     try {
       await this.settings.save({ [key]: value });
-    } catch {
-      this.saveError.set('Could not save your appearance choice. It applies until you close the app.');
+    } catch (e) {
+      this.saveError.set(saveFailed(e));
     }
   }
 
@@ -70,8 +72,12 @@ export class AppearanceService {
     this.saveError.set('');
     try {
       await this.settings.save({ [PANEL_WIDTH.key]: String(width) });
-    } catch {
-      this.saveError.set('Could not save your appearance choice. It applies until you close the app.');
+    } catch (e) {
+      this.saveError.set(saveFailed(e));
     }
   }
+}
+
+function saveFailed(e: unknown): string {
+  return `${reportError('Could not save your appearance choice.', e)} The new look applies until you close the app.`;
 }

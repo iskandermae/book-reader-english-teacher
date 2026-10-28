@@ -53,6 +53,13 @@ describe.each([
 });
 
 describe('LlmService.runAction', () => {
+  // Failures are logged on purpose; keep the test output clean and let tests assert on it.
+  let consoleError: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  });
+  afterEach(() => consoleError.mockRestore());
+
   afterEach(() => vi.unstubAllGlobals());
 
   it('posts to the action id with the selection and streams the chunks', async () => {
