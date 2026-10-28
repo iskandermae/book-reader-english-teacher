@@ -26,7 +26,8 @@ public sealed class SettingsServiceTests : IDisposable
     {
         var all = await _service.GetAllAsync();
 
-        Assert.Equal(12, all.Count);
+        Assert.Equal(13, all.Count);
+        Assert.Equal("B2", all[SettingsService.LanguageLevel]);
         Assert.Equal("English", all[SettingsService.LanguageFrom]);
         Assert.Equal(BookReader.Core.Llm.TranslatePrompt.DefaultTemplate, all[SettingsService.PromptTranslate]);
         Assert.Equal(BookReader.Core.Llm.ExplainPrompt.DefaultTemplate, all[SettingsService.PromptExplain]);
@@ -53,6 +54,28 @@ public sealed class SettingsServiceTests : IDisposable
 
         Assert.Contains(expected, ex.Message);
         Assert.Equal("Ukrainian", await _service.GetAsync(SettingsService.LanguageNative));
+    }
+
+    [Theory]
+    [InlineData("C1", true)]
+    [InlineData("A1", true)]
+    [InlineData("b2", false)]
+    [InlineData("D1", false)]
+    [InlineData("", false)]
+    public async Task Language_level_accepts_only_cefr_levels(string level, bool valid)
+    {
+        var update = _service.UpdateAsync(new Dictionary<string, string?> { [SettingsService.LanguageLevel] = level });
+
+        if (valid)
+        {
+            await update;
+            Assert.Equal(level, await _service.GetAsync(SettingsService.LanguageLevel));
+        }
+        else
+        {
+            await Assert.ThrowsAsync<SettingsValidationException>(() => update);
+            Assert.Equal("B2", await _service.GetAsync(SettingsService.LanguageLevel));
+        }
     }
 
     [Fact]

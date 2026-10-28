@@ -12,10 +12,17 @@ describe('SettingsComponent', () => {
   });
   afterEach(() => consoleError.mockRestore());
 
+  // Defaults for the calls a test does not care about.
+  const withDefaults = (service: Partial<SettingsService>): Partial<SettingsService> => ({
+    loadModels: () => Promise.resolve([]),
+    loadPlaceholders: () => Promise.resolve([]),
+    ...service,
+  });
+
   async function render(service: Partial<SettingsService>, actions: Partial<ActionsService> = { load: () => Promise.resolve([]), save: (list) => Promise.resolve(list) }) {
     TestBed.configureTestingModule({
       imports: [SettingsComponent],
-      providers: [provideRouter([]), { provide: SettingsService, useValue: service }, { provide: ActionsService, useValue: actions }],
+      providers: [provideRouter([]), { provide: SettingsService, useValue: withDefaults(service) }, { provide: ActionsService, useValue: actions }],
     });
     const fixture = TestBed.createComponent(SettingsComponent);
     await fixture.whenStable();
@@ -65,6 +72,66 @@ describe('SettingsComponent', () => {
     expect(el.querySelector<HTMLButtonElement>('button[type=submit]')!.disabled).toBe(true);
   });
 
+  describe('General AI settings', () => {
+    const general = { 'language.native': 'Russian', 'language.from': 'English', 'language.level': 'B2', 'ollama.url': 'http://localhost:11434', 'ollama.model': 'llama3' };
+    const options = (el: HTMLElement, name: string) => Array.from(el.querySelectorAll<HTMLOptionElement>(`select[name="${name}"] option`)).map((o) => o.value);
+
+    it('loads the fields and saves edits including the level', async () => {
+      const save = vi.fn().mockResolvedValue(general);
+      const fixture = await render({ load: () => Promise.resolve(general), save, loadModels: () => Promise.resolve(['llama3', 'qwen']) });
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector<HTMLInputElement>('input[name="language.native"]')!.value).toBe('Russian');
+      expect(el.querySelector<HTMLInputElement>('input[name="ollama.url"]')!.value).toBe('http://localhost:11434');
+      expect(el.querySelector<HTMLSelectElement>('select[name="language.level"]')!.value).toBe('B2');
+      expect(options(el, 'language.level')).toEqual(['A1', 'A2', 'B1', 'B2', 'C1', 'C2']);
+
+      const level = el.querySelector<HTMLSelectElement>('select[name="language.level"]')!;
+      level.value = 'C1';
+      level.dispatchEvent(new Event('change'));
+      el.querySelector('form')!.dispatchEvent(new Event('submit'));
+      await fixture.whenStable();
+      expect(save).toHaveBeenCalledWith({ ...general, 'language.level': 'C1' });
+    });
+
+    it('offers the installed models and selects the saved one', async () => {
+      const fixture = await render({ load: () => Promise.resolve(general), loadModels: () => Promise.resolve(['llama3', 'qwen']) });
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+      expect(options(el, 'ollama.model')).toEqual(['llama3', 'qwen']);
+      expect(el.querySelector<HTMLSelectElement>('select[name="ollama.model"]')!.value).toBe('llama3');
+    });
+
+    it('keeps a saved model that is not in the list', async () => {
+      const fixture = await render({ load: () => Promise.resolve({ ...general, 'ollama.model': 'gone' }), loadModels: () => Promise.resolve(['qwen']) });
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+      expect(options(el, 'ollama.model')).toEqual(['gone', 'qwen']);
+      expect(el.querySelector<HTMLSelectElement>('select[name="ollama.model"]')!.value).toBe('gone');
+    });
+
+    it('Refresh reloads the model list', async () => {
+      const loadModels = vi.fn().mockResolvedValueOnce(['a']).mockResolvedValueOnce(['a', 'b']);
+      const fixture = await render({ load: () => Promise.resolve(general), loadModels });
+      const el = fixture.nativeElement as HTMLElement;
+      Array.from(el.querySelectorAll('button')).find((b) => b.textContent === 'Refresh')!.click();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(loadModels).toHaveBeenCalledTimes(2);
+      expect(options(el, 'ollama.model')).toEqual(['llama3', 'a', 'b']);
+    });
+
+    it('shows the list error and keeps the saved model', async () => {
+      const fixture = await render({ load: () => Promise.resolve(general), loadModels: () => Promise.reject({ detail: 'Ollama is not running.' }) });
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('[role=alert]')!.textContent).toContain('Ollama is not running.');
+      expect(consoleError).toHaveBeenCalled();
+      expect(el.querySelector<HTMLSelectElement>('select[name="ollama.model"]')!.value).toBe('llama3');
+      expect(el.querySelector<HTMLButtonElement>('button[type=submit]')!.disabled).toBe(false);
+    });
+  });
+
   describe('Prompts tab', () => {
     const loaded = { 'ui.sample': 's', 'prompt.translate': 'T {selection}', 'prompt.explain': 'E {selection}' };
 
@@ -81,7 +148,6 @@ describe('SettingsComponent', () => {
       const { fixture, el } = await openPrompts({ load: () => Promise.resolve(loaded) });
       expect(el.querySelector('textarea[name="prompt.translate"]')).toBeTruthy();
       expect(el.querySelector<HTMLTextAreaElement>('textarea[name="prompt.explain"]')!.value).toBe('E {selection}');
-      expect(el.textContent).toContain('{paragraph}');
       expect(el.querySelector('input[name="ui.sample"]')).toBeNull();
 
       el.querySelectorAll<HTMLButtonElement>('[role=tab]')[0].click();
@@ -89,6 +155,20 @@ describe('SettingsComponent', () => {
       expect(el.querySelector('textarea')).toBeNull();
       expect(el.querySelector('input[name="prompt.translate"]')).toBeNull();
       expect(el.querySelector('input[name="ui.sample"]')).toBeTruthy();
+    });
+
+    it('lists the variables from the service, with braces added by the UI', async () => {
+      const { el } = await openPrompts({
+        load: () => Promise.resolve(loaded),
+        loadPlaceholders: () => Promise.resolve([{ name: 'english_level', description: 'Your level.' }]),
+      });
+      expect(el.querySelector('li')!.textContent).toContain('{english_level} Your level.');
+    });
+
+    it('shows a message when the variables cannot be loaded', async () => {
+      const { el } = await openPrompts({ load: () => Promise.resolve(loaded), loadPlaceholders: () => Promise.reject(new Error('nope')) });
+      expect(el.querySelector('[role=alert]')!.textContent).toContain('nope');
+      expect(consoleError).toHaveBeenCalled();
     });
 
     it('saves an edited prompt together with the other settings', async () => {

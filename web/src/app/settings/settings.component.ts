@@ -1,8 +1,8 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ActionsService, CustomAction } from './actions.service';
-import { SettingsMap, SettingsService } from './settings.service';
+import { Placeholder, SettingsMap, SettingsService } from './settings.service';
 import { reportError } from '../report-error';
 
 /** The editable built-in prompts (setting key and label). */
@@ -12,6 +12,16 @@ const PROMPTS = [
 ];
 const PROMPT_PREFIX = 'prompt.';
 const MAX_ACTIONS = 20; // same limit as the API
+const LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2']; // CEFR; the API validates the same fixed set
+const MODEL_KEY = 'ollama.model';
+const LEVEL_KEY = 'language.level';
+/** Text settings with their own label; every other non-prompt setting gets a plain input named by its key. */
+const TEXT_FIELDS = [
+  { key: 'language.native', label: 'Native language' },
+  { key: 'language.from', label: 'From language' },
+  { key: 'ollama.url', label: 'Ollama URL' },
+];
+const DEDICATED_KEYS = [...TEXT_FIELDS.map((f) => f.key), LEVEL_KEY, MODEL_KEY];
 
 @Component({
   selector: 'app-settings',
@@ -27,16 +37,48 @@ const MAX_ACTIONS = 20; // same limit as the API
     <form (ngSubmit)="save()">
       <!-- [name] feeds NgModel (form control name); [attr.name] sets the DOM attribute, which NgModel does not. -->
       @if (tab() === 'general') {
+        @for (field of textFields; track field.key) {
+          <p>
+            <label>{{ field.label }} <input [name]="field.key" [attr.name]="field.key" [ngModel]="values()[field.key]" (ngModelChange)="update(field.key, $event)" /></label>
+          </p>
+        }
+        <p>
+          <label>English level
+            <select name="language.level" [ngModel]="values()['language.level']" (ngModelChange)="update('language.level', $event)">
+              @for (level of levels; track level) {
+                <option [value]="level">{{ level }}</option>
+              }
+            </select>
+          </label>
+        </p>
+        <p>
+          <label>Model
+            <select name="ollama.model" [ngModel]="values()['ollama.model']" (ngModelChange)="update('ollama.model', $event)">
+              @for (model of modelOptions(); track model) {
+                <option [value]="model">{{ model || '(none)' }}</option>
+              }
+            </select>
+          </label>
+          <button type="button" (click)="refreshModels()">Refresh</button>
+        </p>
+        @if (modelsError()) {
+          <p role="alert">{{ modelsError() }}</p>
+        }
         @for (key of keys(); track key) {
           <p>
             <label>{{ key }} <input [name]="key" [attr.name]="key" [ngModel]="values()[key]" (ngModelChange)="update(key, $event)" /></label>
           </p>
         }
       } @else {
-        <p>
-          Placeholders: <code>{{ '{selection}' }}</code> (required) <code>{{ '{sentence}' }}</code> <code>{{ '{paragraph}' }}</code>
-          <code>{{ '{native_language}' }}</code> <code>{{ '{target_language}' }}</code> <code>{{ '{from_language}' }}</code>
-        </p>
+        <p>Variables you can use in a prompt (<code>{{ '{selection}' }}</code> is required):</p>
+        @if (placeholdersError()) {
+          <p role="alert">{{ placeholdersError() }}</p>
+        }
+        <ul>
+          @for (p of placeholders(); track p.name) {
+            <li><code>{{ '{' + p.name + '}' }}</code> {{ p.description }}</li>
+          }
+        </ul>
         @for (prompt of prompts; track prompt.key) {
           <p>
             <label>{{ prompt.label }}<br />
@@ -72,6 +114,17 @@ export class SettingsComponent implements OnInit {
   protected readonly values = signal<SettingsMap>({});
   protected readonly keys = signal<string[]>([]); // the General tab: every setting except the prompts
   protected readonly prompts = PROMPTS;
+  protected readonly textFields = TEXT_FIELDS;
+  protected readonly levels = LEVELS;
+  protected readonly placeholders = signal<Placeholder[]>([]);
+  protected readonly placeholdersError = signal('');
+  protected readonly models = signal<string[]>([]);
+  protected readonly modelsError = signal('');
+  // The installed models plus the saved one, so a saved model missing from the list stays visible and selected.
+  protected readonly modelOptions = computed(() => {
+    const saved = this.values()[MODEL_KEY] ?? '';
+    return this.models().includes(saved) ? this.models() : [saved, ...this.models()];
+  });
   protected readonly tab = signal<'general' | 'prompts'>('general');
   protected readonly loaded = signal(false);
   protected readonly message = signal('');
@@ -85,6 +138,25 @@ export class SettingsComponent implements OnInit {
       this.loaded.set(true);
     } catch (e) {
       this.report(reportError('Could not load settings.', e), true);
+    }
+    // Independent of the settings: a failure here must not block editing or saving them.
+    await Promise.all([this.loadPlaceholders(), this.refreshModels()]);
+  }
+
+  protected async refreshModels(): Promise<void> {
+    try {
+      this.models.set(await this.settings.loadModels());
+      this.modelsError.set('');
+    } catch (e) {
+      this.modelsError.set(reportError('Could not load the model list.', e)); // the saved model stays selected
+    }
+  }
+
+  private async loadPlaceholders(): Promise<void> {
+    try {
+      this.placeholders.set(await this.settings.loadPlaceholders());
+    } catch (e) {
+      this.placeholdersError.set(reportError('Could not load the list of variables.', e));
     }
   }
 
@@ -127,7 +199,7 @@ export class SettingsComponent implements OnInit {
   // The API returns the full map, so every setting it knows is rendered without a hardcoded list.
   private show(map: SettingsMap): void {
     this.values.set({ ...map });
-    this.keys.set(Object.keys(map).filter((k) => !k.startsWith(PROMPT_PREFIX)));
+    this.keys.set(Object.keys(map).filter((k) => !k.startsWith(PROMPT_PREFIX) && !DEDICATED_KEYS.includes(k)));
   }
 
   private report(text: string, error: boolean): void {

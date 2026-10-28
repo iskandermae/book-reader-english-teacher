@@ -116,7 +116,7 @@ public class LlmController(ILlmProvider llm, ISettingsService settings, ICustomA
             throw new LlmNotConfiguredException("Set your native language in settings.");
 
         return PromptTemplate.Fill(template(all),
-            new PromptValues(text, sentence, paragraph, all[SettingsService.LanguageNative], all[SettingsService.LanguageFrom]));
+            new PromptValues(text, sentence, paragraph, all[SettingsService.LanguageNative], all[SettingsService.LanguageFrom], all[SettingsService.LanguageLevel]));
     }
 
     // [ApiController] only rejects null; a blank selection is rejected here (shared by the selection tools).

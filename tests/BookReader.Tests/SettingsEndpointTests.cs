@@ -45,6 +45,20 @@ public sealed class SettingsEndpointTests : ApiTestBase
     }
 
     [Fact]
+    public async Task Placeholders_endpoint_lists_every_placeholder_the_validator_accepts()
+    {
+        await using var app = NewApp();
+        using var client = app.CreateClient();
+
+        var list = await client.GetFromJsonAsync<List<PlaceholderDto>>("/api/settings/placeholders");
+
+        Assert.Equal(BookReader.Core.Llm.PromptTemplate.Placeholders.Select(p => p.Name), list!.Select(p => p.Name));
+        Assert.Contains(list, p => p.Name == "english_level" && p.Description != "");
+    }
+
+    private sealed record PlaceholderDto(string Name, string Description);
+
+    [Fact]
     public async Task Ollama_url_has_default_and_valid_value_is_saved()
     {
         await using var app = NewApp();

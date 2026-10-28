@@ -1162,7 +1162,7 @@
         ],
         "summary": "Updates one or more settings. The request is all or nothing; returns all settings after the update.",
         "requestBody": {
-          "description": "Key/value map. Only known keys are accepted; values may be at most 1000 characters (4000 for prompt.* keys). language.from: language of the book, default English. prompt.translate and prompt.explain: prompt templates (default = built-in prompt); allowed placeholders: {selection} (required), {sentence}, {paragraph}, {native_language}, {target_language}, {from_language}; an unknown placeholder or a missing {selection} is rejected. reader.fontSize: small|medium|large|xlarge; reader.theme: light|dark; reader.width: narrow|medium|wide; reader.panelWidth: whole number 20-70 (percent, default 40).",
+          "description": "Key/value map. Only known keys are accepted; values may be at most 1000 characters (4000 for prompt.* keys). language.from: language of the book, default English. language.level: English level A1|A2|B1|B2|C1|C2, default B2. ollama.url: absolute http or https address. prompt.translate and prompt.explain: prompt templates (default = built-in prompt); allowed placeholders: {selection} (required), {sentence}, {paragraph}, {native_language}, {target_language}, {from_language}, {english_level}; an unknown placeholder or a missing {selection} is rejected. reader.fontSize: small|medium|large|xlarge; reader.theme: light|dark; reader.width: narrow|medium|wide; reader.panelWidth: whole number 20-70 (percent, default 40).",
           "content": {
             "application/json": {
               "schema": {
@@ -1275,6 +1275,45 @@
                   "type": "object",
                   "additionalProperties": {
                     "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/placeholders": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Returns the placeholders a prompt template may use ({name} in the template), with a description each. Single source for the settings UI.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlaceholderInfo"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlaceholderInfo"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlaceholderInfo"
                   }
                 }
               }
@@ -1629,6 +1668,21 @@
           }
         },
         "description": "Request of the LLM test endpoint."
+      },
+      "PlaceholderInfo": {
+        "required": [
+          "name",
+          "description"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        }
       },
       "ProblemDetails": {
         "type": "object",

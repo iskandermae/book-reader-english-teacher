@@ -5,15 +5,15 @@ namespace BookReader.Tests;
 public class PromptTemplateTests
 {
     private static PromptValues Values(string selection = " sel ", string? sentence = " sen ", string? paragraph = " par ") =>
-        new(selection, sentence, paragraph, "Ukrainian", "English");
+        new(selection, sentence, paragraph, "Ukrainian", "English", " B2 ");
 
     [Fact]
     public void Fill_replaces_all_placeholders_and_trims_values()
     {
         var result = PromptTemplate.Fill(
-            "{selection}|{sentence}|{paragraph}|{native_language}|{target_language}|{from_language}|{selection}", Values());
+            "{selection}|{sentence}|{paragraph}|{native_language}|{target_language}|{from_language}|{english_level}|{selection}", Values());
 
-        Assert.Equal("sel|sen|par|Ukrainian|Ukrainian|English|sel", result);
+        Assert.Equal("sel|sen|par|Ukrainian|Ukrainian|English|B2|sel", result);
     }
 
     [Theory]
@@ -36,6 +36,19 @@ public class PromptTemplateTests
     public void Validate_accepts_known_placeholders_with_selection()
     {
         Assert.Empty(PromptTemplate.Validate("{selection} {sentence} {paragraph} {native_language} {target_language} {from_language}"));
+    }
+
+    [Fact]
+    public void Every_listed_placeholder_is_filled_and_described()
+    {
+        // Guards the single list against drifting from Fill: no listed placeholder may stay unreplaced.
+        foreach (var placeholder in PromptTemplate.Placeholders)
+        {
+            var result = PromptTemplate.Fill($"{{{placeholder.Name}}}", Values());
+            Assert.NotEqual($"{{{placeholder.Name}}}", result);
+            Assert.False(string.IsNullOrWhiteSpace(placeholder.Description));
+            Assert.Empty(PromptTemplate.Validate($"{{selection}}{{{placeholder.Name}}}"));
+        }
     }
 
     [Fact]

@@ -118,11 +118,19 @@ Depends on S2.6a. Decided with the user: the seeded action is a normal action (e
 - Out of scope: reorder UI, per-action model, Markdown rendering, English level (S2.6c), caching (S2.7), "restore seeded action".
 **Risks**: user can break an action's output format (accepted). Renaming/deleting an action while a result is shown does not affect the shown result.
 
-## S2.6c General AI settings — Story — TODO
-Depends on S2.6a.
-**Acceptance (high level)**
-- Settings UI for native language, from language, English level, Ollama URL, and model (chosen from the installed list).
-- Prompts can use the English level (new placeholder, e.g. `{english_level}`).
+## S2.6c General AI settings (backend + frontend) — Story — DONE
+Depends on S2.6a. Existing: settings `ollama.url`, `ollama.model`, `language.native`, `language.from`; `GET /api/llm/models`, `GET /api/llm/status`, `POST /api/llm/test`.
+**Acceptance**
+- Backend (first): new setting `language.level`, allowed values `A1,A2,B1,B2,C1,C2` (fixed-set validation, like other fixed-set keys), default `B2`. New placeholder `{english_level}` (= `language.level`) in the S2.6a builder and validator; works in built-in prompts and custom actions. Built-in default prompts and the seeded Simplify action are not changed (user can add the placeholder).
+- Backend: `ollama.url` must be an absolute http/https URL (400 otherwise); empty `language.native` / `language.from` stays rejected as today. Nothing saved on error.
+- `api/openapi.json` and the generated client updated if the API surface changes.
+- Backend tests (no network): new setting default/validation (valid, invalid, empty), placeholder filled in and accepted by validator, URL validation.
+- Frontend: Settings > General tab gets proper fields: native language, from language (text inputs), English level (select A1-C2), Ollama URL (text), Model (select from `GET /api/llm/models`, with a Refresh button; the saved model stays visible even if not in the list). If the model list fails (Ollama down), show the error message and keep the saved value. The Settings page shows the list of all available variables (`{selection}`, `{sentence}`, `{paragraph}`, `{native_language}`, `{target_language}`, `{from_language}`, `{english_level}`) with a short description each, in the Prompts tab (prompts and custom actions) and it includes `{english_level}`. User decision 2026-10-28.
+- Backend: the placeholder list (name + description) comes from one backend source, returned by `GET /api/settings/placeholders` (`[{name, description}]`, names without braces; done), so the UI never has a hardcoded copy. Test: list contains every placeholder the builder accepts.
+- Frontend tests (service mocked): fields load and save; level select; model list loaded, refresh, list error keeps saved model; saved model not in list still shown.
+- Out of scope: cloud provider (S2.8), pulling models, connection-test button (exists as endpoint; add only if trivial), changing existing prompts.
+**Assumptions**: levels are CEFR A1-C2 with default B2; free-text languages; no auto-pick of the first model.
+**Risks**: model name from the list must match Ollama exactly (use the list value as is).
 
 ## S2.7 Cache AI results — Enabler — TODO
 **Acceptance**

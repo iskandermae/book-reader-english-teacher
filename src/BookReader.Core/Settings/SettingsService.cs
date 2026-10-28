@@ -25,6 +25,7 @@ public class SettingsService(AppDbContext db) : ISettingsService
     public const string OllamaUrl = "ollama.url";
     public const string LanguageNative = "language.native";
     public const string LanguageFrom = "language.from";
+    public const string LanguageLevel = "language.level";
     public const string PromptTranslate = "prompt.translate";
     public const string PromptExplain = "prompt.explain";
     public const string UiSample = "ui.sample";
@@ -47,6 +48,7 @@ public class SettingsService(AppDbContext db) : ISettingsService
         [OllamaUrl] = "http://localhost:11434",
         [LanguageNative] = "Ukrainian",
         [LanguageFrom] = "English",
+        [LanguageLevel] = "B2",
         [PromptTranslate] = TranslatePrompt.DefaultTemplate,
         [PromptExplain] = ExplainPrompt.DefaultTemplate,
         [UiSample] = "",
@@ -60,6 +62,7 @@ public class SettingsService(AppDbContext db) : ISettingsService
     // Keys that accept only a fixed set of values (an empty string is not allowed for them).
     private static readonly IReadOnlyDictionary<string, string[]> AllowedValues = new Dictionary<string, string[]>
     {
+        [LanguageLevel] = ["A1", "A2", "B1", "B2", "C1", "C2"],
         [ReaderFontSize] = ["small", "medium", "large", "xlarge"],
         [ReaderTheme] = ["light", "dark"],
         [ReaderWidth] = ["narrow", "medium", "wide"],
