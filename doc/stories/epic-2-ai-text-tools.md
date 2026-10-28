@@ -1,6 +1,6 @@
 # Epic 2: AI text tools (MVP)
 
-Depends on: Epic 1. MVP is complete after S2.7.
+Depends on: Epic 1. MVP is complete after S2.6c (S2.7 cache postponed).
 
 ## S2.1 LLM provider abstraction with Ollama — Enabler (backend only) — DONE
 **Acceptance**
@@ -132,18 +132,41 @@ Depends on S2.6a. Existing: settings `ollama.url`, `ollama.model`, `language.nat
 **Assumptions**: levels are CEFR A1-C2 with default B2; free-text languages; no auto-pick of the first model.
 **Risks**: model name from the list must match Ollama exactly (use the list value as is).
 
-## S2.7 Cache AI results — Enabler — TODO
+## S2.7 Cache AI results (backend + frontend) — Enabler — POSTPONED
+User decision 2026-10-28: no cache for now. The draft below is kept for later; S2.8 must not depend on it (cache key idea: provider + model + filled prompt).
+Depends on S2.6c. Applies to Translate, Explain and custom actions (all go through the shared endpoint code).
+**Defaults chosen (change only if the user objects)**
+- Cache key = SHA-256 of (provider id, model, final filled prompt). The filled prompt already contains selection, sentence, paragraph, languages, level and the edited template, so any settings/prompt change gives a new key automatically. No separate "action" part in the key.
+- Only complete, successful results are stored (not errors, not cancelled streams, not empty output).
+- A cache hit streams the stored text through the same SSE format (one chunk), so the frontend does not change for hits.
+- Stored in SQLite in the `data` folder. No expiry. Cap 5000 entries; the oldest (by last use) are removed when over the cap.
+- Setting `cache.enabled` (default `true`, bool). When off: no reads, no writes (existing entries stay).
+- No "regenerate" button (out of scope); to get a new answer the user turns the cache off or clears it.
 **Acceptance**
-- Results are cached in SQLite per (selection, context hash, action, model, settings).
-- A repeated request returns without calling the model.
-- Cache can be cleared from the Settings page.
+- Backend (first): cache table (`key`, `text`, `created`, `last_used`); a small cache service used by the shared LLM endpoint code. Hit -> no provider call, `last_used` updated. Miss -> stream from the provider, store full text at the end.
+- `GET /api/llm/cache` -> `{ count }`; `DELETE /api/llm/cache` clears all, returns 204.
+- `cache.enabled` validated as bool like other bool settings; appears in `GET /api/settings`.
+- `api/openapi.json` and the generated client updated.
+- Backend tests (fake provider, no network): second identical request does not call the provider and returns the same text; different model / language / level / template / selection gives a miss; error and cancelled/empty stream are not stored; disabled setting bypasses cache; cap eviction; clear; count.
+- Frontend: Settings > General: "Cache AI results" checkbox, line "Cached results: N" and a "Clear cache" button (disabled when 0; count refreshes after clear). Failed load/clear shows a message.
+- Frontend tests (service mocked): checkbox loads/saves; count shown; clear calls the API and shows 0; error message.
+- Out of scope: regenerate button, expiry, per-action cache control, cache size in MB.
+**Risks**: LLM output is not deterministic, so the user sees the same answer each time (accepted; toggle/clear). Prompt text stored only as a hash, selected text itself is not stored.
 
-## S2.8 Optional cloud LLM provider — Story (backend + frontend) — TODO
-Depends on S2.6 (settings UI) and S2.7 (cache key includes provider and model). Outside the MVP: the app must stay fully usable with Ollama only (D5).
-**Acceptance (high level, to groom)**
-- A second `ILlmProvider` implementation for one cloud API; the provider is chosen by a setting (`llm.provider`: `ollama` default, or `cloud`). Provider is picked per call from settings (no restart).
-- Settings: provider, cloud model, API key. The key is stored on the backend only and never returned by the API (only "key is set").
-- Settings UI: provider switch, model, API key field, "Test connection".
-- Same streaming (SSE) and error mapping as Ollama (missing key -> 400 with hint, network/401 -> clear message).
-- Unit tests with a fake HTTP handler; no network.
-- Open questions: which cloud API (OpenAI-compatible or Anthropic)? Model list or free text? Is a per-action provider needed?
+## S2.8 Ollama local or cloud mode — Story (backend + frontend) — DROPPED (2026-10-28, cloud models work via local Ollama; no real benefit)
+User decision 2026-10-28: always call `ollama.url` (local Ollama). Cloud models (`...-cloud`, free tier) run through the signed-in local Ollama; the model is picked in our Settings model list. No code needed. Draft below is kept only for a future direct-cloud-with-key mode.
+Depends on S2.6c. User decision 2026-10-28: Ollama only (no other cloud vendor); the user chooses local or cloud. Outside the MVP: local stays the default (D5).
+**Assumption to verify first (backend-dev)**: Ollama cloud = the same API (`/api/chat`, `/api/tags`) at `https://ollama.com` with header `Authorization: Bearer <key>`. If this is wrong, stop and report.
+**Acceptance**
+- New setting `ollama.mode`: `local` (default) or `cloud` (fixed-set validation). Local uses `ollama.url` as today. Cloud uses the fixed URL `https://ollama.com` (a constant) and ignores `ollama.url`.
+- New setting `ollama.apiKey`. Stored on the backend only; `GET /api/settings` never returns its value (returns only whether it is set); empty value on save = keep the old key, a separate "clear key" action removes it. Never written to logs.
+- Mode, URL and key are read on each call (no restart). The same provider class is used; it adds the Bearer header only in cloud mode.
+- Cloud mode with no key -> 400 with a hint; 401/403 from cloud -> clear message "API key rejected"; network error -> existing 503 style message that names the URL.
+- `GET /api/llm/models` and `/status` work in both modes (cloud lists cloud models). The model setting stays one value; switching the mode does not change it (user picks a model again).
+- `api/openapi.json` and the generated client updated.
+- Backend tests (fake HTTP handler, no network): header only in cloud mode and URL is cloud URL; key missing -> 400; 401 mapping; key not in `GET /api/settings`, kept on empty save, cleared by the clear action; mode validation; mode switch takes effect on the next call.
+- Frontend: Settings > General: Mode select (Local / Cloud). Local shows the Ollama URL; Cloud shows the API key field (password type, "key is set" hint, Clear key button) and a note with the cloud URL. Model list is reloaded after mode/key save (Refresh stays). Failed load/save shows a message. A short line says that cloud sends the selected text to ollama.com.
+- Frontend tests (service mocked): fields shown per mode; key never prefilled; save sends key only when typed; clear key; model list refresh; error message.
+- Out of scope: other vendors, per-action provider, cache, connection-test button (unless trivial), key encryption (stored as plain setting in the local `data` DB, accepted for a local app).
+**Notes**: a signed-in local Ollama can already run `...-cloud` models through the local mode with no code change; this story is for direct cloud use with a key.
+**Risks**: privacy (text leaves the machine in cloud mode; warned in the UI); key stored unencrypted in the local DB.

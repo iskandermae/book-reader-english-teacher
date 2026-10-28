@@ -3,12 +3,12 @@
 Last updated: 2026-10-28
 
 ## Phase
-Epic 0 and Epic 1 DONE. Epic 2 in progress: S2.1-S2.4, S2.6a-S2.6c DONE, S2.5 dropped, S2.7 TODO. S2.8 (optional cloud LLM provider, after S2.7, TODO; open: which cloud API).
+Epic 0 and Epic 1 DONE. Epic 2 in progress: S2.1-S2.4, S2.6a-S2.6c DONE, S2.5 dropped, S2.7 postponed. S2.7 (cache) postponed, S2.8 (cloud) dropped.
 
 ## Next action
 S2.6c DONE 2026-10-28 (QA approved; backend 172 / frontend 142 tests, builds OK). QA minors dropped (hardcoded level list is a commented fixed set; raw inputs for other keys existed before). First `npm test` flaked (vitest worker timeout), rerun passed.
 User to review and commit S2.3-S2.6c. Browser checks not done: S2.3c, S2.3d, S2.4, S2.6a, S2.6b, S2.6c (Settings > General fields, model list + Refresh, Ollama down; Prompts variable list). Right-panel text cut-off bug: CSS fix unconfirmed; if still cut, report browser + scrollbar.
-Next: groom S2.7 (cache AI results), then S2.8. Stop the running API before plain `dotnet test`.
+S2.7 (cache) POSTPONED by user 2026-10-28 (draft kept in epic file). Epic 2 MVP done. S2.8 DROPPED: cloud Ollama models work through signed-in local Ollama (`...-cloud`, free tier); user confirmed it works. Epic 2 finished. Next: groom Epic 3. Stop the running API before plain `dotnet test`.
 Decided: default `language.native`=Ukrainian; panel width in `reader.panelWidth`; level CEFR A1-C2 default B2; variables from `GET /api/settings/placeholders`.
 
 ## Commit checklist for the user (Epic 0)
