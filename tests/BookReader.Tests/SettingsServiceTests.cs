@@ -26,7 +26,10 @@ public sealed class SettingsServiceTests : IDisposable
     {
         var all = await _service.GetAllAsync();
 
-        Assert.Equal(9, all.Count);
+        Assert.Equal(12, all.Count);
+        Assert.Equal("English", all[SettingsService.LanguageFrom]);
+        Assert.Equal(BookReader.Core.Llm.TranslatePrompt.DefaultTemplate, all[SettingsService.PromptTranslate]);
+        Assert.Equal(BookReader.Core.Llm.ExplainPrompt.DefaultTemplate, all[SettingsService.PromptExplain]);
         Assert.Equal("40", all[SettingsService.ReaderPanelWidth]);
         Assert.Equal("Ukrainian", all[SettingsService.LanguageNative]);
         Assert.Equal("http://localhost:11434", all[SettingsService.OllamaUrl]);
@@ -35,6 +38,34 @@ public sealed class SettingsServiceTests : IDisposable
         Assert.Equal("medium", all[SettingsService.ReaderWidth]);
         Assert.Equal("", all[SettingsService.OllamaModel]); // never hardcoded (D12)
         Assert.Equal("", all[SettingsService.UiSample]);
+    }
+
+    [Theory]
+    [InlineData("Translate {text} {selection}", "Unknown placeholder '{text}'")]
+    [InlineData("Translate this", "{selection}")]
+    public async Task Update_rejects_invalid_prompt_template_and_saves_nothing(string template, string expected)
+    {
+        var ex = await Assert.ThrowsAsync<SettingsValidationException>(() => _service.UpdateAsync(new Dictionary<string, string?>
+        {
+            [SettingsService.LanguageNative] = "German",
+            [SettingsService.PromptTranslate] = template,
+        }));
+
+        Assert.Contains(expected, ex.Message);
+        Assert.Equal("Ukrainian", await _service.GetAsync(SettingsService.LanguageNative));
+    }
+
+    [Fact]
+    public async Task Prompt_keys_allow_4000_characters_other_keys_stay_at_1000()
+    {
+        var longTemplate = "{selection}" + new string('a', SettingsService.MaxPromptLength - "{selection}".Length);
+        await _service.UpdateAsync(new Dictionary<string, string?> { [SettingsService.PromptExplain] = longTemplate });
+        Assert.Equal(longTemplate, await _service.GetAsync(SettingsService.PromptExplain));
+
+        await Assert.ThrowsAsync<SettingsValidationException>(() =>
+            _service.UpdateAsync(new Dictionary<string, string?> { [SettingsService.PromptExplain] = longTemplate + "a" }));
+        await Assert.ThrowsAsync<SettingsValidationException>(() =>
+            _service.UpdateAsync(new Dictionary<string, string?> { [SettingsService.LanguageFrom] = new string('a', 1001) }));
     }
 
     [Fact]

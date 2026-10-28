@@ -216,6 +216,37 @@ public sealed class LlmEndpointTests : ApiTestBase
         Assert.Contains("Hello, world.", _llm.LastPrompt);
     }
 
+    [Fact]
+    public async Task Translate_and_explain_use_the_saved_template_with_all_placeholders()
+    {
+        await using var app = NewAppWithFakeLlm();
+        using var client = app.CreateClient();
+        await client.PutAsJsonAsync("/api/settings", new Dictionary<string, string>
+        {
+            ["prompt.translate"] = "T[{selection}|{sentence}|{paragraph}|{native_language}|{from_language}]",
+            ["prompt.explain"] = "E[{selection}|{sentence}|{paragraph}]",
+        });
+
+        await client.PostAsJsonAsync("/api/llm/translate", new TranslateRequest("Hello", "Sentence.", "Whole paragraph."));
+        Assert.Equal("T[Hello|Sentence.|Whole paragraph.|Ukrainian|English]", _llm.LastPrompt);
+
+        await client.PostAsJsonAsync("/api/llm/explain", new ExplainRequest("Hello", Paragraph: "Whole paragraph."));
+        Assert.Equal("E[Hello||Whole paragraph.]", _llm.LastPrompt);
+    }
+
+    [Fact]
+    public async Task Invalid_template_is_rejected_and_the_default_prompt_stays_in_use()
+    {
+        await using var app = NewAppWithFakeLlm();
+        using var client = app.CreateClient();
+
+        var put = await client.PutAsJsonAsync("/api/settings", new Dictionary<string, string> { ["prompt.explain"] = "no selection {sentence}" });
+        await client.PostAsJsonAsync("/api/llm/explain", new ExplainRequest("Hello"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, put.StatusCode);
+        Assert.Contains("Meaning:", _llm.LastPrompt);
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("   ")]

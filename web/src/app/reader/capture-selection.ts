@@ -3,6 +3,8 @@ export interface TextSelection {
   text: string;
   /** The sentence(s) around the selection (same paragraph), or the whole paragraphs if several are selected. */
   context: string;
+  /** The paragraph of the selection, or all selected paragraphs joined if several are selected. */
+  paragraph: string;
 }
 
 /** Sentence end: . ! ? (possibly repeated) followed by whitespace. Deliberately simple, no NLP. */
@@ -49,13 +51,13 @@ export function captureSelection(selection: Selection | null, root: HTMLElement)
       .slice(all.indexOf(first), all.indexOf(last) + 1)
       .map((p) => p.textContent)
       .join('\n');
-    return { text, context };
+    return { text, context, paragraph: context };
   }
 
   const paragraph = first.textContent ?? '';
   const start = offsetIn(first, range.startContainer, range.startOffset);
   const end = endsBeforeLast ? paragraph.length : offsetIn(first, range.endContainer, range.endOffset);
-  return { text, context: sentenceContext(paragraph, start, end) };
+  return { text, context: sentenceContext(paragraph, start, end), paragraph };
 }
 
 function paragraphOf(node: Node, root: HTMLElement): HTMLParagraphElement | null {

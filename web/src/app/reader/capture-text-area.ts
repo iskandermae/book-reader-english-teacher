@@ -25,8 +25,9 @@ export function captureTextAreaSelection(value: string, start: number, end: numb
   const last = inside(to - 1);
 
   if (first !== last) {
-    return { text, context: lines.slice(first, last + 1).map((l) => l.text).join('\n') };
+    const context = lines.slice(first, last + 1).map((l) => l.text).join('\n');
+    return { text, context, paragraph: context };
   }
   const line = lines[first];
-  return { text, context: sentenceContext(line.text, from - line.offset, to - line.offset) };
+  return { text, context: sentenceContext(line.text, from - line.offset, to - line.offset), paragraph: line.text };
 }

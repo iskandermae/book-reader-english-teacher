@@ -55,7 +55,7 @@ describe('captureSelection', () => {
   }
 
   it('captures the trimmed text with its sentence', () => {
-    expect(captureSelection(select('p', 11, 17), root)).toEqual({ text: 'Beta t', context: 'Beta two.' });
+    expect(captureSelection(select('p', 11, 17), root)).toEqual({ text: 'Beta t', context: 'Beta two.', paragraph: 'Alpha one. Beta two.' });
   });
 
   it('uses the full paragraphs for a multi-paragraph selection', () => {
@@ -63,6 +63,7 @@ describe('captureSelection', () => {
     expect(captureSelection(selection, root)).toEqual({
       text: 'one. Beta two.Gam',
       context: 'Alpha one. Beta two.\nGamma three.',
+      paragraph: 'Alpha one. Beta two.\nGamma three.',
     });
   });
 
@@ -73,7 +74,7 @@ describe('captureSelection', () => {
     const selection = window.getSelection()!;
     selection.removeAllRanges();
     selection.addRange(range);
-    expect(captureSelection(selection, root)).toEqual({ text: 'Alpha one. Beta two.', context: 'Alpha one. Beta two.' });
+    expect(captureSelection(selection, root)).toEqual({ text: 'Alpha one. Beta two.', context: 'Alpha one. Beta two.', paragraph: 'Alpha one. Beta two.' });
   });
 
   it('ignores a whitespace-only selection', () => {

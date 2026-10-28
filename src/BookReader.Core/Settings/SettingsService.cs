@@ -1,5 +1,6 @@
 using BookReader.Core.Books;
 using BookReader.Core.Data;
+using BookReader.Core.Llm;
 using Microsoft.EntityFrameworkCore;
 
 namespace BookReader.Core.Settings;
@@ -14,7 +15,7 @@ public interface ISettingsService
     Task<string> GetAsync(string key, CancellationToken ct = default);
 
     /// <summary>Validates and saves the given values (all or nothing), then returns all settings.</summary>
-    /// <exception cref="SettingsValidationException">Unknown key, null value or value that is too long, or a value outside the allowed set of a reader setting.</exception>
+    /// <exception cref="SettingsValidationException">Unknown key, null value or value that is too long, or a prompt template with an unknown placeholder or without {selection}, or a value outside the allowed set of a reader setting.</exception>
     Task<IReadOnlyDictionary<string, string>> UpdateAsync(IReadOnlyDictionary<string, string?> values, CancellationToken ct = default);
 }
 
@@ -23,6 +24,9 @@ public class SettingsService(AppDbContext db) : ISettingsService
     public const string OllamaModel = "ollama.model";
     public const string OllamaUrl = "ollama.url";
     public const string LanguageNative = "language.native";
+    public const string LanguageFrom = "language.from";
+    public const string PromptTranslate = "prompt.translate";
+    public const string PromptExplain = "prompt.explain";
     public const string UiSample = "ui.sample";
     public const string ChapterRegex = "import.chapterRegex";
     public const string ReaderFontSize = "reader.fontSize";
@@ -30,6 +34,8 @@ public class SettingsService(AppDbContext db) : ISettingsService
     public const string ReaderWidth = "reader.width";
     public const string ReaderPanelWidth = "reader.panelWidth"; // result panel width, percent of the page
     public const int MaxValueLength = 1000;
+    public const int MaxPromptLength = 4000; // prompt.* keys hold whole templates
+    private const string PromptKeyPrefix = "prompt.";
     private const int MinPanelWidth = 20;
     private const int MaxPanelWidth = 70;
 
@@ -40,6 +46,9 @@ public class SettingsService(AppDbContext db) : ISettingsService
         [OllamaModel] = "",
         [OllamaUrl] = "http://localhost:11434",
         [LanguageNative] = "Ukrainian",
+        [LanguageFrom] = "English",
+        [PromptTranslate] = TranslatePrompt.DefaultTemplate,
+        [PromptExplain] = ExplainPrompt.DefaultTemplate,
         [UiSample] = "",
         [ChapterRegex] = BookParser.DefaultChapterRegex,
         [ReaderFontSize] = "medium",
@@ -55,6 +64,9 @@ public class SettingsService(AppDbContext db) : ISettingsService
         [ReaderTheme] = ["light", "dark"],
         [ReaderWidth] = ["narrow", "medium", "wide"],
     };
+
+    /// <summary>Default value of every known setting, ignoring anything saved (for "Reset to default"). Static: needs no database.</summary>
+    public static IReadOnlyDictionary<string, string> GetDefaults() => Defaults;
 
     public async Task<IReadOnlyDictionary<string, string>> GetAllAsync(CancellationToken ct = default)
     {
@@ -114,12 +126,14 @@ public class SettingsService(AppDbContext db) : ISettingsService
                 errors.Add($"Unknown setting '{key}'. Known settings: {string.Join(", ", Defaults.Keys)}.");
             else if (value is null)
                 errors.Add($"Setting '{key}' must not be null.");
-            else if (value.Length > MaxValueLength)
-                errors.Add($"Setting '{key}' is too long ({value.Length} characters, maximum is {MaxValueLength}).");
+            else if (value.Length > MaxLength(key))
+                errors.Add($"Setting '{key}' is too long ({value.Length} characters, maximum is {MaxLength(key)}).");
             else if (AllowedValues.TryGetValue(key, out var allowed) && !allowed.Contains(value))
                 errors.Add($"Setting '{key}' must be one of: {string.Join(", ", allowed)}.");
             else if (key == ReaderPanelWidth && !IsValidPanelWidth(value))
                 errors.Add($"Setting '{ReaderPanelWidth}' must be a whole number from {MinPanelWidth} to {MaxPanelWidth}.");
+            else if (key.StartsWith(PromptKeyPrefix))
+                errors.AddRange(PromptTemplate.Validate(value).Select(e => $"Setting '{key}': {e}"));
             else if (key == ChapterRegex)
                 ValidateChapterRegex(value, errors);
             else if (key == OllamaUrl && !IsHttpUrl(value))
@@ -128,6 +142,8 @@ public class SettingsService(AppDbContext db) : ISettingsService
         if (errors.Count > 0)
             throw new SettingsValidationException(string.Join(" ", errors));
     }
+
+    private static int MaxLength(string key) => key.StartsWith(PromptKeyPrefix) ? MaxPromptLength : MaxValueLength;
 
     // Invariant culture and digits only: no signs, spaces or decimals, so each value has one spelling.
     private static bool IsValidPanelWidth(string value) =>

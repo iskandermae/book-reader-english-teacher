@@ -694,7 +694,7 @@
         "tags": [
           "Llm"
         ],
-        "summary": "Translates the selected text into the native language (setting `language.native`, Ukrainian by default) and streams the translation.\r\nThe stream format is the same as in the test endpoint. Only `text` is translated; `context` is not used yet (kept for custom prompts).",
+        "summary": "Translates the selected text into the native language (setting `language.native`, Ukrainian by default) and streams the translation.\r\nThe prompt is the saved template `prompt.translate` with its placeholders filled. The stream format is the same as in the test endpoint.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -754,7 +754,7 @@
         "tags": [
           "Llm"
         ],
-        "summary": "Explains the selected text in simple English as three lines (Meaning, Grammar, Usage) and streams the answer.\r\nThe stream format is the same as in the test endpoint. `context` only helps the model choose the meaning in this sentence.",
+        "summary": "Explains the selected text in simple English as three lines (Meaning, Grammar, Usage) and streams the answer.\r\nThe prompt is the saved template `prompt.explain` with its placeholders filled. The stream format is the same as in the test endpoint.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -952,7 +952,7 @@
         ],
         "summary": "Updates one or more settings. The request is all or nothing; returns all settings after the update.",
         "requestBody": {
-          "description": "Key/value map. Only known keys are accepted; values may be at most 1000 characters. reader.fontSize: small|medium|large|xlarge; reader.theme: light|dark; reader.width: narrow|medium|wide; reader.panelWidth: whole number 20-70 (percent, default 40).",
+          "description": "Key/value map. Only known keys are accepted; values may be at most 1000 characters (4000 for prompt.* keys). language.from: language of the book, default English. prompt.translate and prompt.explain: prompt templates (default = built-in prompt); allowed placeholders: {selection} (required), {sentence}, {paragraph}, {native_language}, {target_language}, {from_language}; an unknown placeholder or a missing {selection} is rejected. reader.fontSize: small|medium|large|xlarge; reader.theme: light|dark; reader.width: narrow|medium|wide; reader.panelWidth: whole number 20-70 (percent, default 40).",
           "content": {
             "application/json": {
               "schema": {
@@ -1027,6 +1027,45 @@
               "text/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/defaults": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Returns the default value of every known setting (same shape as the settings list), ignoring saved values. Used to reset a setting, for example a prompt template.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
                 }
               }
             }
@@ -1205,7 +1244,14 @@
               "null",
               "string"
             ],
-            "description": "The sentence(s) around the selection, used to pick the meaning. Optional."
+            "description": "The sentence around the selection (placeholder `{sentence}`). Optional."
+          },
+          "paragraph": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The paragraph around the selection (placeholder `{paragraph}`). Optional."
           }
         },
         "description": "Request of the explain endpoint."
@@ -1409,7 +1455,14 @@
               "null",
               "string"
             ],
-            "description": "The sentence(s) around the selection. Accepted but not used by the translate prompt yet."
+            "description": "The sentence around the selection (placeholder `{sentence}`). Optional."
+          },
+          "paragraph": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The paragraph around the selection (placeholder `{paragraph}`). Optional."
           }
         },
         "description": "Request of the translate endpoint."

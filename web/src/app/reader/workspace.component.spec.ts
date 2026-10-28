@@ -8,7 +8,7 @@ describe('WorkspaceComponent', () => {
   type Mock = ReturnType<typeof vi.fn>;
   let llm: { translate: Mock; explain: Mock };
   let settings: { load: Mock; save: Mock };
-  const selection = { text: 'first 0', context: 'first 0 context' };
+  const selection = { text: 'first 0', context: 'first 0 context', paragraph: 'first 0 paragraph' };
 
   beforeEach(() => {
     llm = { translate: vi.fn(), explain: vi.fn() };
@@ -40,7 +40,7 @@ describe('WorkspaceComponent', () => {
       wake?.();
     };
     const signals: AbortSignal[] = [];
-    llm.translate.mockImplementation(async function* (_t: string, _c: string, signal: AbortSignal) {
+    llm.translate.mockImplementation(async function* (_selection: unknown, signal: AbortSignal) {
       signals.push(signal);
       while (true) {
         while (!queue.length) await new Promise<void>((r) => (wake = r));
@@ -61,7 +61,7 @@ describe('WorkspaceComponent', () => {
     const { fixture, el, button } = create();
     button('Explain').click();
     await settle(fixture);
-    expect(llm.explain).toHaveBeenCalledWith('first 0', 'first 0 context', expect.any(AbortSignal));
+    expect(llm.explain).toHaveBeenCalledWith(selection, expect.any(AbortSignal));
     expect(llm.translate).not.toHaveBeenCalled();
     expect(el.querySelector('.text-result')!.textContent).toBe('Meaning: x');
     expect(el.querySelector('[role=alert]')!.textContent).toContain('Ollama is not running.');
@@ -90,13 +90,13 @@ describe('WorkspaceComponent', () => {
     expect(el.querySelector('.preview')!.textContent).toBe('first 0');
     expect(button('Translate').disabled).toBe(false);
     button('Translate').click();
-    expect(llm.translate).toHaveBeenCalledWith('first 0', 'first 0 context', expect.any(AbortSignal));
+    expect(llm.translate).toHaveBeenCalledWith(selection, expect.any(AbortSignal));
     stream.push(null);
   });
 
   it('replaces the kept selection when a new one is made', () => {
     const { fixture, el } = create();
-    fixture.componentRef.setInput('selection', { text: 'other', context: 'other' });
+    fixture.componentRef.setInput('selection', { text: 'other', context: 'other', paragraph: 'other' });
     fixture.detectChanges();
     expect(el.querySelector('.preview')!.textContent).toBe('other');
   });
@@ -120,7 +120,7 @@ describe('WorkspaceComponent', () => {
   it('shows a preview of the selection and truncates a long one', () => {
     const { fixture, el } = create();
     expect(el.querySelector('.preview')!.textContent).toBe('first 0');
-    fixture.componentRef.setInput('selection', { text: 'x'.repeat(300), context: '' });
+    fixture.componentRef.setInput('selection', { text: 'x'.repeat(300), context: '', paragraph: '' });
     fixture.detectChanges();
     expect(el.querySelector('.preview')!.textContent!.length).toBeLessThan(150);
   });
@@ -132,7 +132,7 @@ describe('WorkspaceComponent', () => {
     stream.push('Part ');
     stream.push('two');
     await settle(fixture);
-    expect(llm.translate).toHaveBeenCalledWith('first 0', 'first 0 context', expect.any(AbortSignal));
+    expect(llm.translate).toHaveBeenCalledWith(selection, expect.any(AbortSignal));
     expect(el.querySelector('.text-result')!.textContent).toBe('Part two');
     stream.push(null);
   });

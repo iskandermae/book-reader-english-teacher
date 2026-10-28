@@ -20,7 +20,7 @@ describe.each([
 
   async function collect(signal = new AbortController().signal) {
     const chunks: string[] = [];
-    for await (const c of service[method]('hello', 'hello world', signal)) chunks.push(c);
+    for await (const c of service[method]({ text: 'hello', context: 'hello world.', paragraph: 'hello world. More.' }, signal)) chunks.push(c);
     return chunks;
   }
 
@@ -29,7 +29,7 @@ describe.each([
     expect(await collect()).toEqual(['He', 'llo']);
     const request: Request = fetchMock.mock.calls[0][0];
     expect(new URL(request.url).pathname).toBe(path);
-    expect(await request.json()).toEqual({ text: 'hello', context: 'hello world' });
+    expect(await request.json()).toEqual({ text: 'hello', context: 'hello world.', paragraph: 'hello world. More.' });
   });
 
   it('throws the problem detail of a rejected request', async () => {

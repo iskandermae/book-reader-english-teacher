@@ -26,6 +26,25 @@ public sealed class SettingsEndpointTests : ApiTestBase
     }
 
     [Fact]
+    public async Task Defaults_return_built_in_values_even_when_other_values_are_saved()
+    {
+        await using var app = NewApp();
+        using var client = app.CreateClient();
+        await client.PutAsJsonAsync("/api/settings", new Dictionary<string, string>
+        {
+            ["prompt.explain"] = "custom {selection}",
+            ["language.native"] = "German",
+        });
+
+        var defaults = await client.GetFromJsonAsync<Dictionary<string, string>>("/api/settings/defaults");
+
+        Assert.Equal(BookReader.Core.Llm.ExplainPrompt.DefaultTemplate, defaults!["prompt.explain"]);
+        Assert.Equal(BookReader.Core.Llm.TranslatePrompt.DefaultTemplate, defaults["prompt.translate"]);
+        Assert.Equal("Ukrainian", defaults["language.native"]);
+        Assert.Equal((await client.GetFromJsonAsync<Dictionary<string, string>>("/api/settings"))!.Keys.Order(), defaults.Keys.Order());
+    }
+
+    [Fact]
     public async Task Ollama_url_has_default_and_valid_value_is_saved()
     {
         await using var app = NewApp();

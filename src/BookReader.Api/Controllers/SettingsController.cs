@@ -15,9 +15,14 @@ public class SettingsController(ISettingsService settings) : ControllerBase
     public async Task<IReadOnlyDictionary<string, string>> Get(CancellationToken ct) =>
         await settings.GetAllAsync(ct);
 
+    /// <summary>Returns the default value of every known setting (same shape as the settings list), ignoring saved values. Used to reset a setting, for example a prompt template.</summary>
+    [HttpGet("defaults")]
+    [ProducesResponseType<Dictionary<string, string>>(StatusCodes.Status200OK)]
+    public IReadOnlyDictionary<string, string> GetDefaults() => SettingsService.GetDefaults();
+
     /// <summary>Updates one or more settings. The request is all or nothing; returns all settings after the update.</summary>
     /// <param name="ct">Cancels the request.</param>
-    /// <param name="values">Key/value map. Only known keys are accepted; values may be at most 1000 characters. reader.fontSize: small|medium|large|xlarge; reader.theme: light|dark; reader.width: narrow|medium|wide; reader.panelWidth: whole number 20-70 (percent, default 40).</param>
+    /// <param name="values">Key/value map. Only known keys are accepted; values may be at most 1000 characters (4000 for prompt.* keys). language.from: language of the book, default English. prompt.translate and prompt.explain: prompt templates (default = built-in prompt); allowed placeholders: {selection} (required), {sentence}, {paragraph}, {native_language}, {target_language}, {from_language}; an unknown placeholder or a missing {selection} is rejected. reader.fontSize: small|medium|large|xlarge; reader.theme: light|dark; reader.width: narrow|medium|wide; reader.panelWidth: whole number 20-70 (percent, default 40).</param>
     /// <response code="400">Unknown key or invalid value; the detail field explains what to fix.</response>
     [HttpPut]
     [ProducesResponseType<Dictionary<string, string>>(StatusCodes.Status200OK)]

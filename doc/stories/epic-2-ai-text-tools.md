@@ -84,20 +84,38 @@ Decided with the user: answer in simple English (not the native language), 3 lab
 - Frontend tests: Explain button calls the service with `{ text, context }` and shows streamed chunks and errors (service mocked).
 - Out of scope: custom prompts and English level (S2.6), caching (S2.7).
 
-## S2.5 Simplify selection — Story — TODO
-**Acceptance**
-- "Simplify" rewrites the selection at a level B2.
-- Same streaming and error behavior as S2.3.
+## S2.5 Simplify selection — REPLACED
+Dropped (2026-10-28). Simplify ships as a default custom action in S2.6b.
 
-## S2.6 AI settings — Story — TODO
+## S2.6a Editable built-in prompts (backend + frontend) — Story — DONE
+Decided with the user (2026-10-28): the template controls the whole prompt including the output format; defaults equal today's prompts. `from_language` is a setting, default `English`. Done before S2.6b/c.
 **Acceptance**
-- Settings for 1-20 more dynamic actions - the same implementation as "Simplify selection" but according to user's settings
-- Example: Explain selection, Rewrite selection in B2 english, and so on
-- User create setting with: name, prompt template (with {selection}, {from_language}, {target_language} substrings, where selected text|languages are inserted)
-- Also offer {sentence} (context sentence) and {paragraph} placeholders (decided in S2.3 grooming: translate uses the selection only).
-- The program prepares the prompt, executes it and put the result to the resulting text box  
-- Settings for native language, English level, Ollama URL and model (chosen from the installed list).
-- Prompts for S2.3-S2.5 use these settings.
+- Backend: new settings `prompt.translate` and `prompt.explain`. Default = today's prompt text written as a template (`TranslatePrompt`/`ExplainPrompt` hold only `DefaultTemplate`; `PromptTemplate.Fill` builds the prompt). `GET /api/settings` returns the effective template. Per-key max length 4000 for `prompt.*` (global 1000 stays for other keys).
+- New setting `language.from`, default `English` (shown as a plain input in the generic form until S2.6c).
+- Placeholders: `{selection}`, `{sentence}`, `{paragraph}`, `{native_language}` (= `language.native`), `{target_language}` (same value for now), `{from_language}` (= `language.from`). One pure, unit-tested function fills them in a single pass (text inserted by a placeholder is not expanded again). Empty `{sentence}`/`{paragraph}` -> empty string.
+- Validation on save: unknown `{placeholder}` -> 400; template without `{selection}` -> 400; nothing saved on error (same as other keys).
+- Translate and Explain endpoints read the saved template on each call. Default Explain template: context block becomes `Context sentence (may be empty): {sentence}`-style text, so it works when empty (small wording change vs today, accepted).
+- API: `TranslateRequest`/`ExplainRequest` get optional `paragraph`; `context` stays and means the sentence. Translate now passes both to the builder. `api/openapi.json` and the generated client updated.
+- Frontend capture: `TextSelection` gets `paragraph` (single paragraph: its text; several paragraphs: the joined paragraphs, same as `context` today; scratchpad: the line). `LlmService` sends it. Reader and scratchpad both work.
+- Frontend Settings: a "Prompts" tab (the existing form stays in a "General" tab). Per prompt: textarea, placeholder list, "Reset to default" (sets the default text; saved with the Save button). Failed load/save shows a message.
+- Tests (no network): builder (all placeholders, empty context, single pass), validation (unknown, missing `{selection}`, length), endpoints use the saved template, defaults equal the old output for Translate; frontend: capture paragraph, service sends it, Prompts tab (load, edit, save, reset, error).
+- Added during work: `GET /api/settings/defaults` (needed for Reset to default).
+- Known: Explain now also returns 400 when `language.native` is blank (shared check, accepted).
+- Out of scope: custom actions (S2.6b), model/URL/level UI (S2.6c), caching (S2.7).
+**Risks**: user can break the output format (accepted; Reset to default). Sentence split is a simple regex (existing).
+
+## S2.6b Custom actions (backend + frontend) — Story — TODO
+Depends on S2.6a.
+**Acceptance (high level)**
+- User creates 1-20 actions: name + prompt template (same placeholders as S2.6a). Each appears as a button in the action bar; the program builds the prompt, runs it, streams the result into the result panel (same streaming/errors as S2.3).
+- Managed in the "Prompts" tab.
+- A default action "Simplify (B2)" is seeded (replaces S2.5).
+
+## S2.6c General AI settings — Story — TODO
+Depends on S2.6a.
+**Acceptance (high level)**
+- Settings UI for native language, from language, English level, Ollama URL, and model (chosen from the installed list).
+- Prompts can use the English level (new placeholder, e.g. `{english_level}`).
 
 ## S2.7 Cache AI results — Enabler — TODO
 **Acceptance**

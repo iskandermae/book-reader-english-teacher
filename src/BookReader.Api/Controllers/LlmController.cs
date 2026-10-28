@@ -45,7 +45,7 @@ public class LlmController(ILlmProvider llm, ISettingsService settings) : Contro
 
     /// <summary>
     /// Translates the selected text into the native language (setting <c>language.native</c>, Ukrainian by default) and streams the translation.
-    /// The stream format is the same as in the test endpoint. Only <c>text</c> is translated; <c>context</c> is not used yet (kept for custom prompts).
+    /// The prompt is the saved template <c>prompt.translate</c> with its placeholders filled. The stream format is the same as in the test endpoint.
     /// </summary>
     /// <response code="400">Blank text, no model chosen in settings, or the chosen model is not installed.</response>
     /// <response code="503">Ollama is not reachable; the detail field says how to fix it.</response>
@@ -58,16 +58,12 @@ public class LlmController(ILlmProvider llm, ISettingsService settings) : Contro
         if (IsBlankText(request.Text, out var invalid))
             return invalid;
 
-        var language = await settings.GetAsync(SettingsService.LanguageNative, ct);
-        if (string.IsNullOrWhiteSpace(language))
-            throw new LlmNotConfiguredException("Set your native language in settings.");
-
-        return await StreamAsync(TranslatePrompt.Build(request.Text, language.Trim()), ct);
+        return await StreamAsync(await BuildPromptAsync(SettingsService.PromptTranslate, request.Text, request.Context, request.Paragraph, ct), ct);
     }
 
     /// <summary>
     /// Explains the selected text in simple English as three lines (Meaning, Grammar, Usage) and streams the answer.
-    /// The stream format is the same as in the test endpoint. <c>context</c> only helps the model choose the meaning in this sentence.
+    /// The prompt is the saved template <c>prompt.explain</c> with its placeholders filled. The stream format is the same as in the test endpoint.
     /// </summary>
     /// <response code="400">Blank text, no model chosen in settings, or the chosen model is not installed.</response>
     /// <response code="503">Ollama is not reachable; the detail field says how to fix it.</response>
@@ -80,7 +76,18 @@ public class LlmController(ILlmProvider llm, ISettingsService settings) : Contro
         if (IsBlankText(request.Text, out var invalid))
             return invalid;
 
-        return await StreamAsync(ExplainPrompt.Build(request.Text, request.Context), ct);
+        return await StreamAsync(await BuildPromptAsync(SettingsService.PromptExplain, request.Text, request.Context, request.Paragraph, ct), ct);
+    }
+
+    // Reads the saved template and languages on every call, so a settings change applies without restart.
+    private async Task<string> BuildPromptAsync(string templateKey, string text, string? sentence, string? paragraph, CancellationToken ct)
+    {
+        var all = await settings.GetAllAsync(ct);
+        if (string.IsNullOrWhiteSpace(all[SettingsService.LanguageNative]))
+            throw new LlmNotConfiguredException("Set your native language in settings.");
+
+        return PromptTemplate.Fill(all[templateKey],
+            new PromptValues(text, sentence, paragraph, all[SettingsService.LanguageNative], all[SettingsService.LanguageFrom]));
     }
 
     // [ApiController] only rejects null; a blank selection is rejected here (shared by the selection tools).
@@ -130,10 +137,12 @@ public record LlmTestRequest(string Prompt);
 
 /// <summary>Request of the translate endpoint.</summary>
 /// <param name="Text">The selected text to translate. Required.</param>
-/// <param name="Context">The sentence(s) around the selection. Accepted but not used by the translate prompt yet.</param>
-public record TranslateRequest(string Text, string? Context = null);
+/// <param name="Context">The sentence around the selection (placeholder <c>{sentence}</c>). Optional.</param>
+/// <param name="Paragraph">The paragraph around the selection (placeholder <c>{paragraph}</c>). Optional.</param>
+public record TranslateRequest(string Text, string? Context = null, string? Paragraph = null);
 
 /// <summary>Request of the explain endpoint.</summary>
 /// <param name="Text">The selected text to explain. Required.</param>
-/// <param name="Context">The sentence(s) around the selection, used to pick the meaning. Optional.</param>
-public record ExplainRequest(string Text, string? Context = null);
+/// <param name="Context">The sentence around the selection (placeholder <c>{sentence}</c>). Optional.</param>
+/// <param name="Paragraph">The paragraph around the selection (placeholder <c>{paragraph}</c>). Optional.</param>
+public record ExplainRequest(string Text, string? Context = null, string? Paragraph = null);

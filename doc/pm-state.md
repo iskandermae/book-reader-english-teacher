@@ -1,15 +1,16 @@
 # PM State
 
-Last updated: 2026-10-27
+Last updated: 2026-10-28
 
 ## Phase
-Epic 0 and Epic 1 DONE. Epic 2 in progress: S2.1-S2.3d DONE. S2.4 DONE, S2.5-S2.7 TODO (need grooming). S2.8 (optional cloud LLM provider, after S2.7, TODO; open: which cloud API) added 2026-10-27.
+Epic 0 and Epic 1 DONE. Epic 2 in progress: S2.1-S2.3d DONE. S2.4 DONE, S2.5 dropped, S2.6a DONE, S2.6b-c and S2.7 TODO. S2.8 (optional cloud LLM provider, after S2.7, TODO; open: which cloud API) added 2026-10-27.
 
 ## Next action
 S2.3, S2.3b, S2.3c DONE (QA approved; backend 122 / frontend 95 tests, builds OK). User to review and commit them; S2.3c not checked in a browser yet (`npm start`: select text, Translate, drag divider, reload, narrow window).
 Bug from user (2026-10-28): right panel text is cut off by 1-3 chars at the right edge; CSS fix applied (scrollbar-gutter, right padding, overflow-x hidden), unconfirmed in browser. User to check; if still cut, report browser + whether panel has a scrollbar.
 User change (2026-10-28): panel keeps the last non-empty selection (preview + buttons stay) until a new non-empty selection or chapter change; DONE (95 -> 98 frontend tests, build OK). Clear button clears the result only; kept selection stays. Small follow-up, no separate QA round.
-S2.3d scratchpad DONE (QA approved; backend 127 / frontend 112 tests, builds OK; saves chained, maxlength added). User to review and commit; browser check of the Text page (`/text`: textarea selection incl. drag ending outside, layout, autosave, Clear) not done. S2.4 (Explain) DONE 2026-10-28 (QA approved; backend 135 / frontend 118 tests, builds OK). User to review and commit; browser check of Explain not done. QA minors dropped (cancel covered by Translate tests; IsBlankText style harmless). Next: groom S2.5 (Simplify; add one wrapper in LlmService). Postponed: shared host per API test class.
+S2.3d scratchpad DONE (QA approved; backend 127 / frontend 112 tests, builds OK; saves chained, maxlength added). User to review and commit; browser check of the Text page (`/text`: textarea selection incl. drag ending outside, layout, autosave, Clear) not done. S2.4 (Explain) DONE 2026-10-28 (QA approved; backend 135 / frontend 118 tests, builds OK). User to review and commit; browser check of Explain not done. QA minors dropped (cancel covered by Translate tests; IsBlankText style harmless). Postponed: shared host per API test class.
+S2.6a (editable Translate/Explain prompts, Prompts tab, Reset to default, `GET /api/settings/defaults`) DONE 2026-10-28 (QA approved; backend 146 / frontend 123 tests, builds OK). User to review and commit; browser check not done (Settings > Prompts: edit, bad template 400, reset, Translate/Explain with edited prompt; Explain with empty sentence). QA minors dropped: hardcoded prompt list/placeholder help text (S2.6b reworks it), Explain 400 on blank native (accepted), CRLF in templates harmless. Stop the running API before plain `dotnet test`. S2.5 dropped; next: S2.6b (custom actions, seeds Simplify) needs grooming, then S2.6c, S2.7, S2.8.
 Decided in S2.3: default `language.native`=Ukrainian, Native/Literal output, panel closes on chapter change, `</text>` injection ignored. Decided in S2.3c: panel width stored in setting `reader.panelWidth` (not localStorage).
 
 ## Commit checklist for the user (Epic 0)

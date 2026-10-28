@@ -108,7 +108,7 @@ export class WorkspaceComponent {
     const request = (this.request = new AbortController());
     this.result.set({ text: '', error: '', loading: true });
     try {
-      for await (const chunk of this.llm[action](selected.text, selected.context, request.signal)) {
+      for await (const chunk of this.llm[action](selected, request.signal)) {
         // A replaced or cleared request must not write into a newer result.
         if (this.request !== request) break;
         this.result.update((r) => r && { ...r, text: r.text + chunk, loading: false });

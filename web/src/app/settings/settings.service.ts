@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { getApiSettings, putApiSettings } from '../api';
+import { getApiSettings, getApiSettingsDefaults, putApiSettings } from '../api';
 
 export type SettingsMap = Record<string, string>;
 
@@ -8,6 +8,12 @@ export type SettingsMap = Record<string, string>;
 export class SettingsService {
   async load(): Promise<SettingsMap> {
     const { data } = await getApiSettings({ throwOnError: true });
+    return data;
+  }
+
+  /** The built-in value of every setting (what a reset puts back). */
+  async loadDefaults(): Promise<SettingsMap> {
+    const { data } = await getApiSettingsDefaults({ throwOnError: true });
     return data;
   }
 
