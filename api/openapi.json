@@ -136,6 +136,441 @@
         }
       }
     },
+    "/api/books/{bookId}/audio": {
+      "get": {
+        "tags": [
+          "Audio"
+        ],
+        "summary": "Lists the audio files of a book, ordered by first chapter. Empty list when there are none.",
+        "parameters": [
+          {
+            "name": "bookId",
+            "in": "path",
+            "description": "Book id.",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The audio files.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AudioFileResponse"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AudioFileResponse"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AudioFileResponse"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No book with this id.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Audio"
+        ],
+        "summary": "Attaches an audio file to a book: copies it into the data folder and stores its chapter range (default: the whole book). Upload limit: 1 GB per file.",
+        "parameters": [
+          {
+            "name": "bookId",
+            "in": "path",
+            "description": "Book id.",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Last chapter covered (zero-based chapter index, inclusive). Default: the last chapter of the book.",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "$ref": "#/components/schemas/IFormFile"
+                  },
+                  "FromChapter": {
+                    "pattern": "^-?(?:0|[1-9]\\d*)$",
+                    "type": [
+                      "integer",
+                      "string"
+                    ],
+                    "format": "int32"
+                  },
+                  "ToChapter": {
+                    "pattern": "^-?(?:0|[1-9]\\d*)$",
+                    "type": [
+                      "integer",
+                      "string"
+                    ],
+                    "format": "int32"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The file was attached.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AudioFileResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AudioFileResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AudioFileResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No file, unsupported type, empty file, a range outside the book, From after To, or a range that overlaps another audio file of the book. Nothing is saved.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No book with this id.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/books/{bookId}/audio/{audioId}": {
+      "put": {
+        "tags": [
+          "Audio"
+        ],
+        "summary": "Changes the chapter range of an audio file.",
+        "parameters": [
+          {
+            "name": "bookId",
+            "in": "path",
+            "description": "Book id.",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "audioId",
+            "in": "path",
+            "description": "Audio file id.",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "The new first and last chapter.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AudioRangeRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AudioRangeRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/AudioRangeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The range was saved.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AudioFileResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AudioFileResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AudioFileResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The range is outside the book, From is after To, or it overlaps another audio file of the book.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No book or audio file with this id.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Audio"
+        ],
+        "summary": "Removes an audio file: deletes its database row and the copy in the data folder.",
+        "parameters": [
+          {
+            "name": "bookId",
+            "in": "path",
+            "description": "Book id.",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "audioId",
+            "in": "path",
+            "description": "Audio file id.",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The audio file was removed."
+          },
+          "404": {
+            "description": "No book or audio file with this id.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/books/{bookId}/audio/{audioId}/content": {
+      "get": {
+        "tags": [
+          "Audio"
+        ],
+        "summary": "Streams the audio file. Supports HTTP range requests (206 Partial Content), so seeking works; use it as the `src` of an audio element.",
+        "parameters": [
+          {
+            "name": "bookId",
+            "in": "path",
+            "description": "Book id.",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "audioId",
+            "in": "path",
+            "description": "Audio file id.",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The whole file (no Range header)."
+          },
+          "206": {
+            "description": "The requested byte range."
+          },
+          "404": {
+            "description": "No book or audio file with this id, or the stored file is missing.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "The requested range is not satisfiable.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/books": {
       "get": {
         "tags": [
@@ -1352,6 +1787,102 @@
         },
         "description": "Request of the run-action endpoint."
       },
+      "AudioFileResponse": {
+        "required": [
+          "id",
+          "bookId",
+          "fileName",
+          "contentType",
+          "sizeBytes",
+          "fromChapter",
+          "toChapter"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Audio file id.",
+            "format": "int32"
+          },
+          "bookId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Book id.",
+            "format": "int32"
+          },
+          "fileName": {
+            "type": "string",
+            "description": "The uploaded file name, for display."
+          },
+          "contentType": {
+            "type": "string",
+            "description": "Media type, e.g. audio/mpeg."
+          },
+          "sizeBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Size of the stored file in bytes.",
+            "format": "int64"
+          },
+          "fromChapter": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "First chapter covered (zero-based chapter index).",
+            "format": "int32"
+          },
+          "toChapter": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Last chapter covered (zero-based chapter index, inclusive).",
+            "format": "int32"
+          }
+        },
+        "description": "An audio file of a book and the chapters it covers."
+      },
+      "AudioRangeRequest": {
+        "required": [
+          "fromChapter",
+          "toChapter"
+        ],
+        "type": "object",
+        "properties": {
+          "fromChapter": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "First chapter covered (zero-based chapter index).",
+            "format": "int32"
+          },
+          "toChapter": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Last chapter covered (zero-based chapter index, inclusive).",
+            "format": "int32"
+          }
+        },
+        "description": "A new chapter range for an audio file."
+      },
       "BookChaptersResponse": {
         "required": [
           "bookId",
@@ -1811,6 +2342,9 @@
   "tags": [
     {
       "name": "Actions"
+    },
+    {
+      "name": "Audio"
     },
     {
       "name": "Books"

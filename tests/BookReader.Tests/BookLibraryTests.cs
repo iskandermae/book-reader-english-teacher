@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging.Abstractions;
+using BookReader.Core.Audio;
 using BookReader.Core.Books;
 using BookReader.Core.Data;
 using Microsoft.Data.Sqlite;
@@ -17,7 +19,7 @@ public sealed class BookLibraryTests : IDisposable
         _connection.Open();
         _db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseSqlite(_connection).Options);
         _db.Database.EnsureCreated();
-        _service = new BookLibraryService(_db);
+        _service = new BookLibraryService(_db, new AudioStorage(Path.Combine(Path.GetTempPath(), "bookreader-unused"), NullLogger<AudioStorage>.Instance));
     }
 
     public void Dispose()

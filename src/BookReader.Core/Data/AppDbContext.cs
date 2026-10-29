@@ -1,4 +1,5 @@
 using BookReader.Core.Actions;
+using BookReader.Core.Audio;
 using BookReader.Core.Books;
 using BookReader.Core.Scratchpad;
 using BookReader.Core.Settings;
@@ -15,6 +16,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Book> Books => Set<Book>();
     public DbSet<Chapter> Chapters => Set<Chapter>();
     public DbSet<Paragraph> Paragraphs => Set<Paragraph>();
+    public DbSet<AudioFile> AudioFiles => Set<AudioFile>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -43,6 +45,15 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         {
             e.Property(b => b.Title).HasMaxLength(BookImportService.MaxTitleLength);
             e.HasMany(b => b.Chapters).WithOne().HasForeignKey(c => c.BookId).OnDelete(DeleteBehavior.Cascade);
+            e.HasMany(b => b.AudioFiles).WithOne().HasForeignKey(a => a.BookId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // The file name is user text, so it is capped; the range rules live in AudioService.
+        modelBuilder.Entity<AudioFile>(e =>
+        {
+            e.Property(a => a.FileName).HasMaxLength(260);
+            e.Property(a => a.StoredFileName).HasMaxLength(100);
+            e.Property(a => a.ContentType).HasMaxLength(50);
         });
 
         // Unique (parent, index) keeps order stable and gives the reader a fast lookup of a chapter / paragraph.

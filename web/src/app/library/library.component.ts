@@ -44,6 +44,7 @@ import { reportError } from '../report-error';
           <li>
             <a [routerLink]="['/books', book.id]">{{ book.title }}</a>{{ ' - ' }}{{ book.chapterCount }} chapters - last opened:
             {{ book.lastOpenedAt ? (book.lastOpenedAt | date: 'medium') : 'never' }}
+            <a [routerLink]="['/books', book.id, 'audio']">Audio</a>
             @if (confirmingId() === book.id) {
               Delete?
               <button type="button" (click)="remove(book)">Yes</button>

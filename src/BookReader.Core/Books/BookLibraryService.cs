@@ -1,3 +1,4 @@
+using BookReader.Core.Audio;
 using BookReader.Core.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -41,7 +42,7 @@ public interface IBookLibraryService
     Task<bool> DeleteAsync(int id, CancellationToken ct = default);
 }
 
-public class BookLibraryService(AppDbContext db) : IBookLibraryService
+public class BookLibraryService(AppDbContext db, AudioStorage audioStorage) : IBookLibraryService
 {
     public Task<List<BookSummary>> ListAsync(CancellationToken ct = default) =>
         db.Books
@@ -116,8 +117,13 @@ public class BookLibraryService(AppDbContext db) : IBookLibraryService
 
     public async Task<bool> DeleteAsync(int id, CancellationToken ct = default)
     {
-        // Chapters and paragraphs go with the book through the cascade-delete foreign keys.
+        // Read the audio file names first: the rows disappear with the book, the copies must be removed by hand.
+        var audioFiles = await db.AudioFiles.Where(a => a.BookId == id).Select(a => a.StoredFileName).ToListAsync(ct);
+
+        // Chapters, paragraphs and audio rows go with the book through the cascade-delete foreign keys.
         var deleted = await db.Books.Where(b => b.Id == id).ExecuteDeleteAsync(ct);
+        if (deleted > 0)
+            audioStorage.Delete(audioFiles);
         return deleted > 0;
     }
 }

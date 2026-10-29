@@ -1,5 +1,6 @@
 using BookReader.Api.Filters;
 using BookReader.Core.Actions;
+using BookReader.Core.Audio;
 using BookReader.Core.Books;
 using BookReader.Core.Data;
 using BookReader.Core.Llm;
@@ -24,6 +25,9 @@ builder.Services.AddScoped<LlmExceptionFilter>();
 builder.Services.AddScoped<ILlmProvider, OllamaProvider>();
 builder.Services.AddScoped<IBookImportService, BookImportService>();
 builder.Services.AddScoped<IBookLibraryService, BookLibraryService>();
+builder.Services.AddSingleton(sp => new AudioStorage(dataFolder, sp.GetRequiredService<ILogger<AudioStorage>>()));
+builder.Services.AddScoped<IAudioService, AudioService>();
+builder.Services.AddScoped<AudioExceptionFilter>();
 builder.Services.AddDbContext<AppDbContext>(options =>
     // Migrations live in the Api assembly because it is the startup project for `dotnet ef`.
     options.UseSqlite($"Data Source={DataFolder.DatabasePath(dataFolder)}",

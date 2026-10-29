@@ -50,6 +50,49 @@ namespace BookReader.Api.Migrations
                         });
                 });
 
+            modelBuilder.Entity("BookReader.Core.Audio.AudioFile", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("AddedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("BookId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(260)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("FromChapter")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("StoredFileName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ToChapter")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BookId");
+
+                    b.ToTable("AudioFiles");
+                });
+
             modelBuilder.Entity("BookReader.Core.Books.Book", b =>
                 {
                     b.Property<int>("Id")
@@ -157,6 +200,15 @@ namespace BookReader.Api.Migrations
                     b.ToTable("Settings");
                 });
 
+            modelBuilder.Entity("BookReader.Core.Audio.AudioFile", b =>
+                {
+                    b.HasOne("BookReader.Core.Books.Book", null)
+                        .WithMany("AudioFiles")
+                        .HasForeignKey("BookId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("BookReader.Core.Books.Chapter", b =>
                 {
                     b.HasOne("BookReader.Core.Books.Book", null)
@@ -177,6 +229,8 @@ namespace BookReader.Api.Migrations
 
             modelBuilder.Entity("BookReader.Core.Books.Book", b =>
                 {
+                    b.Navigation("AudioFiles");
+
                     b.Navigation("Chapters");
                 });
 

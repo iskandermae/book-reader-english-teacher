@@ -1,3 +1,5 @@
+using BookReader.Core.Audio;
+
 namespace BookReader.Core.Books;
 
 /// <summary>An imported book. Chapters (and their paragraphs) are deleted together with it.</summary>
@@ -13,6 +15,7 @@ public class Book
     /// <summary>Saved reading position: zero-based paragraph index inside that chapter.</summary>
     public int? PositionParagraphIndex { get; set; }
     public List<Chapter> Chapters { get; set; } = [];
+    public List<AudioFile> AudioFiles { get; set; } = [];
 }
 
 public class Chapter
