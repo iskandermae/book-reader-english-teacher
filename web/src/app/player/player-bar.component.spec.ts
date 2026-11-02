@@ -1,10 +1,12 @@
 import { TestBed } from '@angular/core/testing';
 import { PlayerBarComponent } from './player-bar.component';
+import { AudioService } from '../audio/audio.service';
 import { PlayerSpeedService } from './player-speed.service';
 
 describe('PlayerBarComponent', () => {
   let consoleError: ReturnType<typeof vi.spyOn>;
   let speeds: { load: ReturnType<typeof vi.fn>; save: ReturnType<typeof vi.fn> };
+  let audioApi: { savePosition: ReturnType<typeof vi.fn> };
   let play: ReturnType<typeof vi.spyOn>;
   let pause: ReturnType<typeof vi.spyOn>;
 
@@ -14,13 +16,19 @@ describe('PlayerBarComponent', () => {
     play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
     pause = vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => undefined);
     speeds = { load: vi.fn().mockResolvedValue(1), save: vi.fn().mockResolvedValue(undefined) };
-    TestBed.configureTestingModule({ providers: [{ provide: PlayerSpeedService, useValue: speeds }] });
+    audioApi = { savePosition: vi.fn().mockResolvedValue(undefined) };
+    TestBed.configureTestingModule({
+      providers: [{ provide: PlayerSpeedService, useValue: speeds }, { provide: AudioService, useValue: audioApi }],
+    });
   });
   afterEach(() => vi.restoreAllMocks());
 
-  async function create() {
+  async function create(startPosition = 0) {
     const fixture = TestBed.createComponent(PlayerBarComponent);
     fixture.componentRef.setInput('src', '/audio.mp3');
+    fixture.componentRef.setInput('bookId', 3);
+    fixture.componentRef.setInput('audioId', 9);
+    fixture.componentRef.setInput('startPosition', startPosition);
     await fixture.whenStable();
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
@@ -127,5 +135,96 @@ describe('PlayerBarComponent', () => {
     fixture.detectChanges();
     expect(el.querySelector('[role=alert]')).not.toBeNull();
     expect(consoleError).toHaveBeenCalled();
+  });
+
+  describe('remembering the position', () => {
+    // Plays the element at `time` and fires the browser's timeupdate.
+    function tick(audio: HTMLAudioElement, time: number) {
+      audio.currentTime = time;
+      audio.dispatchEvent(new Event('timeupdate'));
+    }
+
+    beforeEach(() => vi.useFakeTimers({ toFake: ['Date'] }));
+    afterEach(() => vi.useRealTimers());
+
+    it('saves while playing at most every 5 s', async () => {
+      const { audio } = await create();
+      audio.dispatchEvent(new Event('play'));
+      vi.setSystemTime(Date.now() + 5000);
+      tick(audio, 10);
+      expect(audioApi.savePosition).toHaveBeenCalledTimes(1);
+      expect(audioApi.savePosition).toHaveBeenLastCalledWith(3, 9, 10);
+      vi.advanceTimersByTime(4000);
+      tick(audio, 14);
+      expect(audioApi.savePosition).toHaveBeenCalledTimes(1);
+      vi.advanceTimersByTime(1000);
+      tick(audio, 15);
+      expect(audioApi.savePosition).toHaveBeenCalledTimes(2);
+      expect(audioApi.savePosition).toHaveBeenLastCalledWith(3, 9, 15);
+    });
+
+    it('does not save time updates while paused', async () => {
+      const { audio } = await create();
+      vi.setSystemTime(Date.now() + 10000);
+      tick(audio, 10);
+      expect(audioApi.savePosition).not.toHaveBeenCalled();
+    });
+
+    it('saves on pause, on seek and when the component is destroyed', async () => {
+      const { fixture, audio, button } = await create();
+      audio.currentTime = 20;
+      audio.dispatchEvent(new Event('pause'));
+      expect(audioApi.savePosition).toHaveBeenLastCalledWith(3, 9, 20);
+      button('+10 s').click();
+      expect(audioApi.savePosition).toHaveBeenLastCalledWith(3, 9, 30);
+      audio.currentTime = 40;
+      fixture.destroy();
+      expect(audioApi.savePosition).toHaveBeenLastCalledWith(3, 9, 40);
+      expect(audioApi.savePosition).toHaveBeenCalledTimes(3);
+    });
+
+    it('does not save an unchanged position', async () => {
+      const { fixture, audio } = await create();
+      audio.dispatchEvent(new Event('pause'));
+      fixture.destroy();
+      expect(audioApi.savePosition).not.toHaveBeenCalled();
+    });
+
+    it('starts at the saved position without saving it again', async () => {
+      const { audio, el } = await create(42);
+      expect(audio.currentTime).toBe(42);
+      expect(el.textContent).toContain('0:42');
+      audio.dispatchEvent(new Event('pause'));
+      expect(audioApi.savePosition).not.toHaveBeenCalled();
+    });
+
+    it('starts from 0 when the saved position is within 2 s of the end or past it', async () => {
+      expect((await create(98)).audio.currentTime).toBe(0);
+      expect((await create(100)).audio.currentTime).toBe(0);
+      expect((await create(97.9)).audio.currentTime).toBe(97.9);
+    });
+
+    it('shows a message but keeps playing when saving fails, and retries on the next save', async () => {
+      audioApi.savePosition.mockRejectedValueOnce(new Error('server down'));
+      const { fixture, el, audio } = await create();
+      audio.currentTime = 20;
+      audio.dispatchEvent(new Event('pause'));
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(el.querySelector('[role=alert]')!.textContent).toContain('server down');
+      expect(consoleError).toHaveBeenCalled();
+      audio.dispatchEvent(new Event('pause'));
+      expect(audioApi.savePosition).toHaveBeenCalledTimes(2);
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(el.querySelector('[role=alert]')).toBeNull();
+    });
+
+    it('saves when the file ends', async () => {
+      const { audio } = await create();
+      audio.currentTime = 100;
+      audio.dispatchEvent(new Event('ended'));
+      expect(audioApi.savePosition).toHaveBeenCalledWith(3, 9, 100);
+    });
   });
 });

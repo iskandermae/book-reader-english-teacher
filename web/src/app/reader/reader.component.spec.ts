@@ -3,7 +3,9 @@ import { provideRouter, Router } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { ReaderComponent } from './reader.component';
 import { Chapter, ReaderService } from './reader.service';
+import { By } from '@angular/platform-browser';
 import { AudioService } from '../audio/audio.service';
+import { PlayerBarComponent } from '../player/player-bar.component';
 import { SettingsService } from '../settings/settings.service';
 
 const chapters = [0, 1, 2].map((index) => ({ index, title: `Chapter ${index}` }));
@@ -379,15 +381,17 @@ describe('ReaderComponent', () => {
   });
 
   describe('audio player', () => {
-    const file = (id: number, fromChapter: number, toChapter: number) => ({ id, fileName: `${id}.mp3`, sizeBytes: 1, fromChapter, toChapter });
+    const file = (id: number, fromChapter: number, toChapter: number, positionSeconds = 0) => ({ id, fileName: `${id}.mp3`, sizeBytes: 1, fromChapter, toChapter, positionSeconds });
     const player = (el: HTMLElement) => el.querySelector('app-player-bar');
 
     it('shows the player with the file that covers the open chapter and leaves room for it', async () => {
-      audio.list.mockResolvedValue([file(7, 0, 0), file(8, 1, 2)]);
-      const { el } = await open('/books/5?chapter=1');
+      audio.list.mockResolvedValue([file(7, 0, 0), file(8, 1, 2, 33.5)]);
+      const { harness, el } = await open('/books/5?chapter=1');
       expect(audio.list).toHaveBeenCalledWith(5);
       expect(audio.contentUrl).toHaveBeenLastCalledWith(5, 8);
       expect(player(el)).not.toBeNull();
+      const bar = harness.fixture.debugElement.query(By.directive(PlayerBarComponent)).componentInstance as PlayerBarComponent;
+      expect([bar.bookId(), bar.audioId(), bar.startPosition()]).toEqual([5, 8, 33.5]);
       expect(el.querySelector('.layout')!.classList).toContain('with-player');
     });
 

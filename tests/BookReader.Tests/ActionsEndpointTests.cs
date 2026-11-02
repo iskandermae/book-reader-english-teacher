@@ -15,6 +15,13 @@ public sealed class ActionsEndpointTests : ApiTestBase
 {
     private readonly FakeLlmProvider _llm = new();
 
+    // The invalid-list tests send bad input on purpose; the filter's "Invalid settings" warning is expected noise.
+    protected override string[] QuietLogCategories =>
+    [
+        "BookReader.Api.Filters.SettingsValidationExceptionFilter",
+        "BookReader.Api.Filters.LlmExceptionFilter"
+    ];
+
     private WebApplicationFactory<Program> NewAppWithFakeLlm() =>
         NewApp().WithWebHostBuilder(b => b.ConfigureTestServices(s => s.AddScoped<ILlmProvider>(_ => _llm)));
 

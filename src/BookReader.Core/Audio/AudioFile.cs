@@ -14,4 +14,6 @@ public class AudioFile
     public int FromChapter { get; set; }
     public int ToChapter { get; set; }
     public DateTime AddedAt { get; set; }
+    /// <summary>Where the listener stopped, in seconds. One position per file; independent of the chapter range.</summary>
+    public double PositionSeconds { get; set; }
 }

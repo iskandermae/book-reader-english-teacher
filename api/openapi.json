@@ -491,6 +491,104 @@
         }
       }
     },
+    "/api/books/{bookId}/audio/{audioId}/position": {
+      "put": {
+        "tags": [
+          "Audio"
+        ],
+        "summary": "Remembers where the listener stopped in an audio file. Changing the chapter range keeps it.",
+        "parameters": [
+          {
+            "name": "bookId",
+            "in": "path",
+            "description": "Book id.",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "audioId",
+            "in": "path",
+            "description": "Audio file id.",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "The position in seconds.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AudioPositionRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AudioPositionRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/AudioPositionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "The position was saved."
+          },
+          "400": {
+            "description": "The position is negative.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No book or audio file with this id.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/books/{bookId}/audio/{audioId}/content": {
       "get": {
         "tags": [
@@ -1795,7 +1893,8 @@
           "contentType",
           "sizeBytes",
           "fromChapter",
-          "toChapter"
+          "toChapter",
+          "positionSeconds"
         ],
         "type": "object",
         "properties": {
@@ -1851,9 +1950,36 @@
             ],
             "description": "Last chapter covered (zero-based chapter index, inclusive).",
             "format": "int32"
+          },
+          "positionSeconds": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "description": "Saved playback position in seconds (0 when never played).",
+            "format": "double"
           }
         },
         "description": "An audio file of a book and the chapters it covers."
+      },
+      "AudioPositionRequest": {
+        "required": [
+          "positionSeconds"
+        ],
+        "type": "object",
+        "properties": {
+          "positionSeconds": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "description": "Seconds from the start of the file; zero or more.",
+            "format": "double"
+          }
+        },
+        "description": "A playback position to remember."
       },
       "AudioRangeRequest": {
         "required": [

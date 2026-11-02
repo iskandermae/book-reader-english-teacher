@@ -8,6 +8,7 @@ import { AudioFile, AudioService } from './audio.service';
 const chapters = [0, 1, 2].map((index) => ({ index, title: `Chapter ${index}` }));
 const stored = (id: number, fromChapter: number, toChapter: number): AudioFile => ({
   id,
+  positionSeconds: 0,
   fileName: `part${id}.mp3`,
   sizeBytes: 3 * 1024 * 1024,
   fromChapter,

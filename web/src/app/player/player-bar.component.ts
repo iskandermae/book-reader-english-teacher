@@ -1,8 +1,13 @@
-import { Component, ElementRef, inject, input, OnInit, signal, viewChild } from '@angular/core';
+import { Component, ElementRef, inject, input, OnDestroy, OnInit, signal, viewChild } from '@angular/core';
+import { AudioService } from '../audio/audio.service';
 import { reportError } from '../report-error';
 import { PLAYER_SPEEDS, DEFAULT_SPEED, PlayerSpeedService } from './player-speed.service';
 
 const SKIP_SECONDS = 10;
+/** While playing, the position is saved at most this often. */
+const SAVE_INTERVAL_MS = 5000;
+/** A saved position this close to the end (or the end itself) means "listened to the end": start again from 0. */
+const RESTART_WITHIN_SECONDS = 2;
 
 /** Fixed bar at the bottom of the page: play/pause, seek, skip and speed for one audio source. */
 @Component({
@@ -16,7 +21,7 @@ const SKIP_SECONDS = 10;
   template: `
     <audio #audio [src]="src()" preload="metadata"
            (loadedmetadata)="onMetadata()" (durationchange)="onMetadata()" (timeupdate)="onTime()"
-           (play)="playing.set(true)" (pause)="playing.set(false)" (ended)="playing.set(false)"
+           (play)="playing.set(true)" (pause)="onPause()" (ended)="onEnded()"
            (error)="onMediaError()"></audio>
     @if (error()) {
       <p role="alert">{{ error() }}</p>
@@ -39,10 +44,15 @@ const SKIP_SECONDS = 10;
     </div>
   `,
 })
-export class PlayerBarComponent implements OnInit {
+export class PlayerBarComponent implements OnInit, OnDestroy {
   readonly src = input.required<string>();
+  readonly bookId = input.required<number>();
+  readonly audioId = input.required<number>();
+  /** Saved position in seconds to resume from. */
+  readonly startPosition = input(0);
 
   private readonly speedService = inject(PlayerSpeedService);
+  private readonly audioService = inject(AudioService);
   private readonly audio = viewChild.required<ElementRef<HTMLAudioElement>>('audio');
 
   protected readonly speeds = PLAYER_SPEEDS;
@@ -52,6 +62,11 @@ export class PlayerBarComponent implements OnInit {
   protected readonly duration = signal(0);
   protected readonly speed = signal<number>(DEFAULT_SPEED);
   protected readonly error = signal('');
+
+  private positionRestored = false;
+  private lastSavedPosition: number | null = null;
+  private lastSaveAt = 0;
+  private saveFailed = false;
 
   async ngOnInit(): Promise<void> {
     try {
@@ -87,6 +102,7 @@ export class PlayerBarComponent implements OnInit {
     // Clamp so a skip never leaves the file (duration is NaN until the metadata is loaded).
     el.currentTime = Math.min(Math.max(0, seconds), el.duration || seconds);
     this.current.set(el.currentTime);
+    void this.savePosition();
   }
 
   protected async chooseSpeed(value: string): Promise<void> {
@@ -104,10 +120,28 @@ export class PlayerBarComponent implements OnInit {
     const el = this.audio().nativeElement;
     this.duration.set(Number.isFinite(el.duration) ? el.duration : 0);
     this.applySpeed();
+    this.restorePosition(el);
   }
 
   protected onTime(): void {
-    this.current.set(this.audio().nativeElement.currentTime);
+    const el = this.audio().nativeElement;
+    this.current.set(el.currentTime);
+    // Throttled: timeupdate fires several times a second.
+    if (this.playing() && Date.now() - this.lastSaveAt >= SAVE_INTERVAL_MS) void this.savePosition();
+  }
+
+  protected onPause(): void {
+    this.playing.set(false);
+    void this.savePosition();
+  }
+
+  protected onEnded(): void {
+    this.playing.set(false);
+    void this.savePosition();
+  }
+
+  ngOnDestroy(): void {
+    void this.savePosition();
   }
 
   protected onMediaError(): void {
@@ -120,6 +154,42 @@ export class PlayerBarComponent implements OnInit {
     const m = Math.floor(total / 60);
     const s = String(total % 60).padStart(2, '0');
     return `${m}:${s}`;
+  }
+
+  /** Jumps to the saved position once, when the duration is first known. Not a user seek, so nothing is saved. */
+  private restorePosition(el: HTMLAudioElement): void {
+    if (this.positionRestored || !Number.isFinite(el.duration)) return;
+    this.positionRestored = true;
+    const start = this.startPosition();
+    const nearEnd = start >= el.duration - RESTART_WITHIN_SECONDS;
+    el.currentTime = nearEnd ? 0 : start;
+    this.current.set(el.currentTime);
+    this.lastSavedPosition = this.startPosition();
+  }
+
+  /**
+   * Saves the current position. Failures only show a message: playback must keep working.
+   * Nothing is sent before the saved position was restored (the element is still at 0) or when it did not change.
+   */
+  private async savePosition(): Promise<void> {
+    if (!this.positionRestored) return;
+    const position = this.audio().nativeElement.currentTime;
+    if (position === this.lastSavedPosition) return;
+    this.lastSaveAt = Date.now();
+    this.lastSavedPosition = position;
+    try {
+      await this.audioService.savePosition(this.bookId(), this.audioId(), position);
+      if (this.saveFailed) {
+        // Only the save message is cleared; other errors (media, speed) stay.
+        this.saveFailed = false;
+        this.error.set('');
+      }
+    } catch (e) {
+      // Retry on the next save.
+      this.lastSavedPosition = null;
+      this.saveFailed = true;
+      this.error.set(reportError('Could not save the audio position.', e));
+    }
   }
 
   private applySpeed(): void {

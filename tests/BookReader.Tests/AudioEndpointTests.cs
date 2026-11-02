@@ -10,6 +10,13 @@ public sealed class AudioEndpointTests : ApiTestBase
 {
     private static readonly byte[] Bytes = Enumerable.Range(0, 200).Select(i => (byte)i).ToArray();
 
+    // The in-memory TestServer can't apply request body size limits, so the upload endpoint logs a warning there.
+    protected override string[] QuietLogCategories =>
+    [
+        "Microsoft.AspNetCore.Routing.EndpointRoutingMiddleware",
+        "Microsoft.AspNetCore.Mvc.Filters.RequestSizeLimitFilter"
+    ];
+
     private string AudioFolder => Path.Combine(DataFolderPath, "audio");
 
     /// <summary>Imports a book with three chapters and returns its id.</summary>
@@ -112,6 +119,41 @@ public sealed class AudioEndpointTests : ApiTestBase
 
         await AssertBadRequestAsync(await client.PutAsJsonAsync($"/api/books/{bookId}/audio/{first.Id}", new AudioRangeRequest(0, 5)), "chapter range is invalid");
         Assert.Equal(HttpStatusCode.NotFound, (await client.PutAsJsonAsync($"/api/books/{bookId}/audio/999", new AudioRangeRequest(0, 0))).StatusCode);
+    }
+
+    [Fact]
+    public async Task Position_is_saved_returned_in_the_list_and_kept_when_the_range_changes()
+    {
+        await using var factory = NewApp();
+        using var client = factory.CreateClient();
+        var bookId = await ImportBookAsync(client);
+        var added = await UploadOkAsync(client, bookId, 0, 1);
+        Assert.Equal(0, added.PositionSeconds);
+
+        var save = await client.PutAsJsonAsync($"/api/books/{bookId}/audio/{added.Id}/position", new AudioPositionRequest(12.5));
+        Assert.Equal(HttpStatusCode.NoContent, save.StatusCode);
+        await client.PutAsJsonAsync($"/api/books/{bookId}/audio/{added.Id}", new AudioRangeRequest(0, 0));
+
+        var listed = Assert.Single((await client.GetFromJsonAsync<List<AudioFileResponse>>($"/api/books/{bookId}/audio"))!);
+        Assert.Equal((12.5, 0), (listed.PositionSeconds, listed.ToChapter));
+    }
+
+    [Fact]
+    public async Task Position_rejects_negative_values_and_unknown_files()
+    {
+        await using var factory = NewApp();
+        using var client = factory.CreateClient();
+        var bookId = await ImportBookAsync(client);
+        var added = await UploadOkAsync(client, bookId);
+        await client.PutAsJsonAsync($"/api/books/{bookId}/audio/{added.Id}/position", new AudioPositionRequest(5));
+
+        await AssertBadRequestAsync(
+            await client.PutAsJsonAsync($"/api/books/{bookId}/audio/{added.Id}/position", new AudioPositionRequest(-1)), "zero or more");
+        Assert.Equal(HttpStatusCode.NotFound, (await client.PutAsJsonAsync($"/api/books/{bookId}/audio/999/position", new AudioPositionRequest(1))).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.PutAsJsonAsync($"/api/books/999/audio/{added.Id}/position", new AudioPositionRequest(1))).StatusCode);
+
+        var listed = Assert.Single((await client.GetFromJsonAsync<List<AudioFileResponse>>($"/api/books/{bookId}/audio"))!);
+        Assert.Equal(5, listed.PositionSeconds); // the rejected value was not saved
     }
 
     [Fact]

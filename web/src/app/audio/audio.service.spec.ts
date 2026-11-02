@@ -21,8 +21,8 @@ describe('AudioService', () => {
   afterEach(() => vi.restoreAllMocks());
 
   it('normalises numeric fields', async () => {
-    respond(200, [{ id: '5', bookId: '1', fileName: 'a.mp3', contentType: 'audio/mpeg', sizeBytes: '2048', fromChapter: '0', toChapter: '3' }]);
-    await expect(service().list(1)).resolves.toEqual([{ id: 5, fileName: 'a.mp3', sizeBytes: 2048, fromChapter: 0, toChapter: 3 }]);
+    respond(200, [{ id: '5', bookId: '1', fileName: 'a.mp3', contentType: 'audio/mpeg', sizeBytes: '2048', fromChapter: '0', toChapter: '3', positionSeconds: 12.5 }]);
+    await expect(service().list(1)).resolves.toEqual([{ id: 5, fileName: 'a.mp3', sizeBytes: 2048, fromChapter: 0, toChapter: 3, positionSeconds: 12.5 }]);
   });
 
   it('builds the streaming URL of an audio file', () => {
@@ -52,11 +52,20 @@ describe('AudioService', () => {
     expect((fetchMock.mock.calls[1][0] as Request).method).toBe('DELETE');
   });
 
+  it('sends the position on save', async () => {
+    const fetchMock = respond(204);
+    await service().savePosition(1, 5, 42.5);
+    const put = fetchMock.mock.calls[0][0] as Request;
+    expect([put.method, put.url]).toEqual(['PUT', 'http://localhost/api/books/1/audio/5/position']);
+    expect(await put.json()).toEqual({ positionSeconds: 42.5 });
+  });
+
   it('rejects with the API detail', async () => {
     respond(400, { detail: 'The range overlaps another audio file.' });
     await expect(service().upload(1, file, 0, 1)).rejects.toThrow('The range overlaps another audio file.');
     await expect(service().updateRange(1, 5, 0, 1)).rejects.toThrow('The range overlaps another audio file.');
     await expect(service().remove(1, 5)).rejects.toThrow('The range overlaps another audio file.');
+    await expect(service().savePosition(1, 5, -1)).rejects.toThrow('The range overlaps another audio file.');
   });
 
   it('rejects with a generic message when the failure has an empty body', async () => {
@@ -64,5 +73,6 @@ describe('AudioService', () => {
     await expect(service().upload(1, file, 0, 1)).rejects.toThrow('Could not upload the audio file.');
     await expect(service().updateRange(1, 5, 0, 1)).rejects.toThrow('Could not change the chapter range.');
     await expect(service().remove(1, 5)).rejects.toThrow('Could not remove the audio file.');
+    await expect(service().savePosition(1, 5, 1)).rejects.toThrow('Could not save the audio position.');
   });
 });

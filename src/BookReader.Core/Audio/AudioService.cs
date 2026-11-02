@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 namespace BookReader.Core.Audio;
 
 /// <summary>An audio file of a book with its chapter range (zero-based, inclusive).</summary>
-public record AudioFileInfo(int Id, int BookId, string FileName, string ContentType, long SizeBytes, int FromChapter, int ToChapter);
+public record AudioFileInfo(int Id, int BookId, string FileName, string ContentType, long SizeBytes, int FromChapter, int ToChapter, double PositionSeconds);
 
 /// <summary>A stored audio file ready to be streamed.</summary>
 public record AudioContent(string Path, string ContentType, string FileName);
@@ -25,6 +25,10 @@ public interface IAudioService
     /// <summary>Changes the chapter range. Null when the book or file is unknown.</summary>
     /// <exception cref="AudioException">The range is invalid or overlaps another file of the book.</exception>
     Task<AudioFileInfo?> UpdateRangeAsync(int bookId, int audioId, int fromChapter, int toChapter, CancellationToken ct = default);
+
+    /// <summary>Saves the playback position. Returns false when the book or file is unknown.</summary>
+    /// <exception cref="AudioException">The position is negative or not a number.</exception>
+    Task<bool> SavePositionAsync(int bookId, int audioId, double positionSeconds, CancellationToken ct = default);
 
     /// <summary>Deletes the DB row and the copied file. Returns false when the book or file is unknown.</summary>
     Task<bool> DeleteAsync(int bookId, int audioId, CancellationToken ct = default);
@@ -95,6 +99,23 @@ public class AudioService(AppDbContext db, AudioStorage storage, ILogger<AudioSe
         return ToInfo(audio);
     }
 
+    public async Task<bool> SavePositionAsync(int bookId, int audioId, double positionSeconds, CancellationToken ct = default)
+    {
+        // Beyond-the-end is deliberately not checked (the file duration is not stored).
+        if (!double.IsFinite(positionSeconds) || positionSeconds < 0)
+            throw new AudioException("The position must be zero or more seconds.");
+
+        var audio = await db.AudioFiles.FirstOrDefaultAsync(a => a.Id == audioId && a.BookId == bookId, ct);
+        if (audio is null)
+            return false;
+
+        audio.PositionSeconds = positionSeconds;
+        await db.SaveChangesAsync(ct);
+        // Called every few seconds while playing: log at Debug to keep the Information log readable.
+        logger.LogDebug("Audio file {AudioId} of book {BookId} position saved", audioId, bookId);
+        return true;
+    }
+
     public async Task<bool> DeleteAsync(int bookId, int audioId, CancellationToken ct = default)
     {
         var audio = await db.AudioFiles.FirstOrDefaultAsync(a => a.Id == audioId && a.BookId == bookId, ct);
@@ -138,5 +159,5 @@ public class AudioService(AppDbContext db, AudioStorage storage, ILogger<AudioSe
     }
 
     private static AudioFileInfo ToInfo(AudioFile a) =>
-        new(a.Id, a.BookId, a.FileName, a.ContentType, a.SizeBytes, a.FromChapter, a.ToChapter);
+        new(a.Id, a.BookId, a.FileName, a.ContentType, a.SizeBytes, a.FromChapter, a.ToChapter, a.PositionSeconds);
 }

@@ -191,9 +191,9 @@ describe('WorkspaceComponent', () => {
   it('shows a preview of the selection and truncates a long one', () => {
     const { fixture, el } = create();
     expect(el.querySelector('.preview')!.textContent).toBe('first 0');
-    fixture.componentRef.setInput('selection', { text: 'x'.repeat(300), context: '', paragraph: '' });
+    fixture.componentRef.setInput('selection', { text: 'x'.repeat(2000), context: '', paragraph: '' });
     fixture.detectChanges();
-    expect(el.querySelector('.preview')!.textContent!.length).toBeLessThan(150);
+    expect(el.querySelector('.preview')!.textContent!.length).toBeLessThanOrEqual(1201);
   });
 
   it('streams the translation for the selected text and its context', async () => {

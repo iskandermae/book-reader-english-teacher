@@ -75,6 +75,9 @@ namespace BookReader.Api.Migrations
                     b.Property<int>("FromChapter")
                         .HasColumnType("INTEGER");
 
+                    b.Property<double>("PositionSeconds")
+                        .HasColumnType("REAL");
+
                     b.Property<long>("SizeBytes")
                         .HasColumnType("INTEGER");
 

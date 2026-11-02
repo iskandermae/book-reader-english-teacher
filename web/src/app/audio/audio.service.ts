@@ -5,6 +5,7 @@ import {
   getApiBooksByBookIdAudio,
   postApiBooksByBookIdAudio,
   putApiBooksByBookIdAudioByAudioId,
+  putApiBooksByBookIdAudioByAudioIdPosition,
 } from '../api';
 
 export interface AudioFile {
@@ -14,6 +15,8 @@ export interface AudioFile {
   /** Zero-based chapter index, inclusive. */
   fromChapter: number;
   toChapter: number;
+  /** Where the listener stopped, in seconds. */
+  positionSeconds: number;
 }
 
 /** Thin wrapper over the generated client so components can be tested without HTTP. */
@@ -28,6 +31,7 @@ export class AudioService {
       sizeBytes: Number(a.sizeBytes),
       fromChapter: Number(a.fromChapter),
       toChapter: Number(a.toChapter),
+      positionSeconds: Number(a.positionSeconds),
     }));
   }
 
@@ -55,6 +59,16 @@ export class AudioService {
     });
     if (!response?.ok) {
       throw new Error(error?.detail ?? 'Could not change the chapter range.');
+    }
+  }
+
+  async savePosition(bookId: number, audioId: number, positionSeconds: number): Promise<void> {
+    const { error, response } = await putApiBooksByBookIdAudioByAudioIdPosition({
+      path: { bookId, audioId },
+      body: { positionSeconds },
+    });
+    if (!response?.ok) {
+      throw new Error(error?.detail ?? 'Could not save the audio position.');
     }
   }
 

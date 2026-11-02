@@ -26,12 +26,17 @@ public class AddAudioRequest
 /// <param name="SizeBytes">Size of the stored file in bytes.</param>
 /// <param name="FromChapter">First chapter covered (zero-based chapter index).</param>
 /// <param name="ToChapter">Last chapter covered (zero-based chapter index, inclusive).</param>
-public record AudioFileResponse(int Id, int BookId, string FileName, string ContentType, long SizeBytes, int FromChapter, int ToChapter);
+/// <param name="PositionSeconds">Saved playback position in seconds (0 when never played).</param>
+public record AudioFileResponse(int Id, int BookId, string FileName, string ContentType, long SizeBytes, int FromChapter, int ToChapter, double PositionSeconds);
 
 /// <summary>A new chapter range for an audio file.</summary>
 /// <param name="FromChapter">First chapter covered (zero-based chapter index).</param>
 /// <param name="ToChapter">Last chapter covered (zero-based chapter index, inclusive).</param>
 public record AudioRangeRequest(int FromChapter, int ToChapter);
+
+/// <summary>A playback position to remember.</summary>
+/// <param name="PositionSeconds">Seconds from the start of the file; zero or more.</param>
+public record AudioPositionRequest(double PositionSeconds);
 
 [ApiController]
 [Route("api/books/{bookId:int}/audio")]
@@ -42,7 +47,7 @@ public class AudioController(IAudioService audio) : ControllerBase
     private const long MaxUploadBytes = 1024L * 1024 * 1024;
 
     private static AudioFileResponse ToResponse(AudioFileInfo a) =>
-        new(a.Id, a.BookId, a.FileName, a.ContentType, a.SizeBytes, a.FromChapter, a.ToChapter);
+        new(a.Id, a.BookId, a.FileName, a.ContentType, a.SizeBytes, a.FromChapter, a.ToChapter, a.PositionSeconds);
 
     /// <summary>Lists the audio files of a book, ordered by first chapter. Empty list when there are none.</summary>
     /// <param name="bookId">Book id.</param>
@@ -97,6 +102,22 @@ public class AudioController(IAudioService audio) : ControllerBase
         await audio.UpdateRangeAsync(bookId, audioId, range.FromChapter, range.ToChapter, ct) is { } updated
             ? ToResponse(updated)
             : NotFound();
+
+    // Keep the "request" param doc last: the OpenAPI generator uses the last param doc as the request body description.
+    /// <summary>Remembers where the listener stopped in an audio file. Changing the chapter range keeps it.</summary>
+    /// <param name="bookId">Book id.</param>
+    /// <param name="audioId">Audio file id.</param>
+    /// <param name="ct">Cancels the request.</param>
+    /// <param name="request">The position in seconds.</param>
+    /// <response code="204">The position was saved.</response>
+    /// <response code="400">The position is negative.</response>
+    /// <response code="404">No book or audio file with this id.</response>
+    [HttpPut("{audioId:int}/position")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> SavePosition(int bookId, int audioId, CancellationToken ct, AudioPositionRequest request) =>
+        await audio.SavePositionAsync(bookId, audioId, request.PositionSeconds, ct) ? NoContent() : NotFound();
 
     /// <summary>Removes an audio file: deletes its database row and the copy in the data folder.</summary>
     /// <param name="bookId">Book id.</param>

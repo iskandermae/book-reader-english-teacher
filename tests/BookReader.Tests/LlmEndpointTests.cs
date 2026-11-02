@@ -14,6 +14,13 @@ public sealed class LlmEndpointTests : ApiTestBase
 {
     private readonly FakeLlmProvider _llm = new();
 
+    // Tests send bad input / simulate a missing model on purpose; the filters' warnings are expected noise.
+    protected override string[] QuietLogCategories =>
+    [
+        "BookReader.Api.Filters.SettingsValidationExceptionFilter",
+        "BookReader.Api.Filters.LlmExceptionFilter"
+    ];
+
     private WebApplicationFactory<Program> NewAppWithFakeLlm() =>
         NewApp().WithWebHostBuilder(b => b.ConfigureTestServices(s => s.AddScoped<ILlmProvider>(_ => _llm)));
 

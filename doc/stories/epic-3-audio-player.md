@@ -30,11 +30,24 @@ Decisions (user, 2026-10-29): file = the one whose range covers the current chap
 - Out of scope: position memory (S3.3), switching audio on chapter change (S3.4), keyboard shortcuts, recording.
 - Verify: unit tests; browser check with a sample mp3 (play, seek, skip, speed, reload keeps speed).
 
-## S3.3 Remember audio position — Story — TODO
+## S3.3 Remember audio position — Story — DONE
+Assumptions (PM defaults, user may change): position is stored in the DB as a field of the audio file row (deleted with the file, no extra cleanup); one position per audio file, not per chapter.
+
 **Acceptance**
-- Position is saved per audio file (debounced) and restored on reopen.
+- Backend: audio file has `positionSeconds` (default 0, new migration). `PUT /api/books/{id}/audio/{audioId}/position` saves it; rejects negative values and beyond-file-length is not checked. The audio list/get response includes it. `openapi.json` regenerated.
+- Player saves the position while playing at most every 5 s, and also on pause, seek, and when leaving the reader page.
+- When the player opens a file, it starts at the saved position. If the saved position is within 2 s of the end (or the file ended), it starts from 0.
+- Changing the chapter range of a file keeps its position.
+- Backend unit tests: save, negative rejected, unknown file 404, position in response. Frontend tests (fake timers): throttled save, save on pause/seek/destroy, restore on load, restart near the end.
+- Out of scope: switching audio on chapter change (S3.4), syncing text to audio, position per device.
+- Verify: unit tests; browser check (play, reload, position restored).
 
 ## S3.4 Switch audio with the chapter — Story — TODO
 **Acceptance**
 - Navigating to another chapter loads the mapped audio file.
+- The player bar is recreated per audio file (e.g. `@for` track by file id), because restore runs once per instance (S3.3 note).
 - Chapters without audio show a clear "no audio" state.
+
+## S3.5 Hot keys — Story — TODO
+**Acceptance**
+- Audio player hot keys for +-10 sec and Play/pause 

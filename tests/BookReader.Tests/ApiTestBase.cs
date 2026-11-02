@@ -16,7 +16,15 @@ public abstract class ApiTestBase : IDisposable
             // Tests only: drop host/EF Core info logs; real warnings and errors still show.
             // Must be config, not SetMinimumLevel: appsettings.json's Logging:LogLevel:Default filter rule overrides it.
             b.UseSetting("Logging:LogLevel:Default", "Warning");
+            foreach (var category in QuietLogCategories)
+                b.UseSetting($"Logging:LogLevel:{category}", "Error");
         });
+
+    /// <summary>
+    /// Log categories whose expected warnings a test class hides (set to Error). Override per class, so the
+    /// shared host stays noisy for everything else.
+    /// </summary>
+    protected virtual string[] QuietLogCategories => [];
 
     public void Dispose()
     {

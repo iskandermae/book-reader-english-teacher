@@ -73,6 +73,9 @@ public sealed class SettingsEndpointTests : ApiTestBase
         Assert.Equal("http://192.168.1.5:11434", after!["ollama.url"]);
     }
 
+    // The 400 tests send bad input on purpose; the filter's "Invalid settings" warning is expected noise.
+    protected override string[] QuietLogCategories => ["BookReader.Api.Filters.SettingsValidationExceptionFilter"];
+
     [Fact]
     public async Task Put_with_unknown_key_returns_400_with_message()
     {

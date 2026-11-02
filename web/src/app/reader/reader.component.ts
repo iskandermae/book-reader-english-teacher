@@ -92,7 +92,8 @@ const SELECTION_DELAY_MS = 150;
         </app-workspace>
       </div>
       @if (audioFile(); as file) {
-        <app-player-bar [src]="audio.contentUrl(bookId(), file.id)" />
+        <app-player-bar [src]="audio.contentUrl(bookId(), file.id)" [bookId]="bookId()" [audioId]="file.id"
+                        [startPosition]="file.positionSeconds" />
       }
     }
   `,
