@@ -5,7 +5,7 @@ import { TextSelection } from './capture-selection';
 import { LlmService } from './llm.service';
 import { reportError } from '../report-error';
 
-const PREVIEW_CHARS = 120;
+const PREVIEW_CHARS = 1200;
 const KEY_STEP = 2; // percent per arrow press
 
 type StreamStarter = (selection: TextSelection, signal: AbortSignal) => AsyncGenerator<string>;
@@ -23,7 +23,8 @@ type StreamStarter = (selection: TextSelection, signal: AbortSignal) => AsyncGen
     /* The panel stays in view while the text scrolls. */
     /* The vertical scrollbar gets its own gutter and the right padding is larger, so text is never drawn under it.
        min-width 0 + flex none keep the width exactly as set; long words wrap instead of being clipped. */
-    aside { position: sticky; top: 0; max-height: 100vh; flex: none; min-width: 0; overflow-x: hidden; overflow-y: auto;
+    /* --player-space (set by the reader while the fixed player bar shows) keeps the panel's end above the bar. */
+    aside { position: sticky; top: 0; max-height: calc(100vh - var(--player-space, 0px)); flex: none; min-width: 0; overflow-x: hidden; overflow-y: auto;
             scrollbar-gutter: stable; box-sizing: border-box; padding: 0.5rem 1rem 0.5rem 0.5rem; }
     [role=separator] { align-self: stretch; width: 0.4rem; cursor: col-resize; background: GrayText; opacity: 0.4; touch-action: none; }
     [role=separator]:hover, [role=separator]:focus { opacity: 1; }

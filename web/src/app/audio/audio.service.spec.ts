@@ -25,6 +25,10 @@ describe('AudioService', () => {
     await expect(service().list(1)).resolves.toEqual([{ id: 5, fileName: 'a.mp3', sizeBytes: 2048, fromChapter: 0, toChapter: 3 }]);
   });
 
+  it('builds the streaming URL of an audio file', () => {
+    expect(service().contentUrl(1, 5)).toBe('http://localhost/api/books/1/audio/5/content');
+  });
+
   it('uploads one multipart request with the file and range', async () => {
     const fetchMock = respond(200, {});
     await service().upload(1, file, 2, 4);

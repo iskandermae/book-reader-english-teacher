@@ -26,7 +26,8 @@ public sealed class SettingsServiceTests : IDisposable
     {
         var all = await _service.GetAllAsync();
 
-        Assert.Equal(13, all.Count);
+        Assert.Equal(14, all.Count);
+        Assert.Equal("1", all[SettingsService.PlayerSpeed]);
         Assert.Equal("B2", all[SettingsService.LanguageLevel]);
         Assert.Equal("English", all[SettingsService.LanguageFrom]);
         Assert.Equal(BookReader.Core.Llm.TranslatePrompt.DefaultTemplate, all[SettingsService.PromptTranslate]);
@@ -171,6 +172,28 @@ public sealed class SettingsServiceTests : IDisposable
             new Dictionary<string, string?> { [key] = value }));
 
         Assert.Contains($"'{key}'", ex.Message);
+    }
+
+    [Theory]
+    [InlineData("0.75")]
+    [InlineData("1.5")]
+    public async Task Update_accepts_player_speed_options(string value)
+    {
+        var all = await _service.UpdateAsync(new Dictionary<string, string?> { [SettingsService.PlayerSpeed] = value });
+
+        Assert.Equal(value, all[SettingsService.PlayerSpeed]);
+    }
+
+    [Theory]
+    [InlineData("2")]
+    [InlineData("1.0")]
+    [InlineData("")]
+    public async Task Update_rejects_unknown_player_speed(string value)
+    {
+        var ex = await Assert.ThrowsAsync<SettingsValidationException>(() => _service.UpdateAsync(
+            new Dictionary<string, string?> { [SettingsService.PlayerSpeed] = value }));
+
+        Assert.Contains($"'{SettingsService.PlayerSpeed}'", ex.Message);
     }
 
     [Theory]

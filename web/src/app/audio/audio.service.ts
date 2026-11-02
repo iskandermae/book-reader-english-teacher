@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import { client } from '../api/client.gen';
 import {
   deleteApiBooksByBookIdAudioByAudioId,
   getApiBooksByBookIdAudio,
@@ -28,6 +29,11 @@ export class AudioService {
       fromChapter: Number(a.fromChapter),
       toChapter: Number(a.toChapter),
     }));
+  }
+
+  /** URL for an audio element's `src`; built by the generated client so the path is never written by hand. */
+  contentUrl(bookId: number, audioId: number): string {
+    return client.buildUrl({ url: '/api/books/{bookId}/audio/{audioId}/content', path: { bookId, audioId } });
   }
 
   /** The server accepts one file per request. Rejects with an Error whose message is the API's readable `detail`. */

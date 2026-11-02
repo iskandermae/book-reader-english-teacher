@@ -3,6 +3,7 @@ import { provideRouter, Router } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { ReaderComponent } from './reader.component';
 import { Chapter, ReaderService } from './reader.service';
+import { AudioService } from '../audio/audio.service';
 import { SettingsService } from '../settings/settings.service';
 
 const chapters = [0, 1, 2].map((index) => ({ index, title: `Chapter ${index}` }));
@@ -37,6 +38,7 @@ describe('ReaderComponent', () => {
   type Mock = ReturnType<typeof vi.fn>;
   let api: { chapters: Mock; chapter: Mock; position: Mock; savePosition: Mock };
   let settings: { load: Mock; save: Mock };
+  let audio: { list: Mock; contentUrl: Mock };
   const observer = () => FakeObserver.instances[FakeObserver.instances.length - 1];
 
   beforeEach(() => {
@@ -46,6 +48,7 @@ describe('ReaderComponent', () => {
     FakeObserver.instances = [];
     vi.stubGlobal('IntersectionObserver', FakeObserver);
     settings = { load: vi.fn().mockResolvedValue({}), save: vi.fn().mockResolvedValue({}) };
+    audio = { list: vi.fn().mockResolvedValue([]), contentUrl: vi.fn((b: number, a: number) => `/api/books/${b}/audio/${a}/content`) };
     api = {
       chapters: vi.fn().mockResolvedValue({ title: 'My Book', chapters }),
       position: vi.fn().mockResolvedValue({ chapterIndex: 0, paragraphIndex: 0 }),
@@ -58,6 +61,7 @@ describe('ReaderComponent', () => {
         provideRouter([{ path: 'books/:id', component: ReaderComponent }]),
         { provide: ReaderService, useValue: api },
         { provide: SettingsService, useValue: settings },
+        { provide: AudioService, useValue: audio },
       ],
     });
   });
@@ -371,6 +375,35 @@ describe('ReaderComponent', () => {
       const remove = vi.spyOn(document, 'removeEventListener');
       harness.fixture.destroy();
       expect(remove).toHaveBeenCalledWith('selectionchange', expect.any(Function));
+    });
+  });
+
+  describe('audio player', () => {
+    const file = (id: number, fromChapter: number, toChapter: number) => ({ id, fileName: `${id}.mp3`, sizeBytes: 1, fromChapter, toChapter });
+    const player = (el: HTMLElement) => el.querySelector('app-player-bar');
+
+    it('shows the player with the file that covers the open chapter and leaves room for it', async () => {
+      audio.list.mockResolvedValue([file(7, 0, 0), file(8, 1, 2)]);
+      const { el } = await open('/books/5?chapter=1');
+      expect(audio.list).toHaveBeenCalledWith(5);
+      expect(audio.contentUrl).toHaveBeenLastCalledWith(5, 8);
+      expect(player(el)).not.toBeNull();
+      expect(el.querySelector('.layout')!.classList).toContain('with-player');
+    });
+
+    it('shows no player when the chapter is not covered or the book has no audio', async () => {
+      audio.list.mockResolvedValue([file(7, 1, 2)]);
+      const { el } = await open('/books/5?chapter=0');
+      expect(player(el)).toBeNull();
+      expect(el.querySelector('.layout')!.classList).not.toContain('with-player');
+    });
+
+    it('shows a message, and still the text, when the audio list fails', async () => {
+      audio.list.mockRejectedValue(new Error('audio down'));
+      const { el } = await open('/books/5');
+      expect(el.querySelector('[role=alert]')!.textContent).toContain('audio down');
+      expect(paragraphs(el)).toEqual(['first 0', 'second 0']);
+      expect(consoleError).toHaveBeenCalled();
     });
   });
 });

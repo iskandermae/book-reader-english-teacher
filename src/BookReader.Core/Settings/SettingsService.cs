@@ -34,6 +34,7 @@ public class SettingsService(AppDbContext db) : ISettingsService
     public const string ReaderTheme = "reader.theme";
     public const string ReaderWidth = "reader.width";
     public const string ReaderPanelWidth = "reader.panelWidth"; // result panel width, percent of the page
+    public const string PlayerSpeed = "player.speed"; // audio playback rate
     public const int MaxValueLength = 1000;
     public const int MaxPromptLength = 4000; // prompt.* keys hold whole templates
     private const string PromptKeyPrefix = "prompt.";
@@ -57,6 +58,7 @@ public class SettingsService(AppDbContext db) : ISettingsService
         [ReaderTheme] = "light",
         [ReaderWidth] = "medium",
         [ReaderPanelWidth] = "40",
+        [PlayerSpeed] = "1",
     };
 
     // Keys that accept only a fixed set of values (an empty string is not allowed for them).
@@ -66,6 +68,7 @@ public class SettingsService(AppDbContext db) : ISettingsService
         [ReaderFontSize] = ["small", "medium", "large", "xlarge"],
         [ReaderTheme] = ["light", "dark"],
         [ReaderWidth] = ["narrow", "medium", "wide"],
+        [PlayerSpeed] = ["0.75", "1", "1.25", "1.5"],
     };
 
     /// <summary>Default value of every known setting, ignoring anything saved (for "Reset to default"). Static: needs no database.</summary>

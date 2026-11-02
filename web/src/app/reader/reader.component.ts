@@ -3,6 +3,8 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
 import { APPEARANCE_OPTIONS, AppearanceKey, AppearanceService } from '../appearance/appearance.service';
+import { AudioFile, AudioService } from '../audio/audio.service';
+import { PlayerBarComponent } from '../player/player-bar.component';
 import { captureSelection, TextSelection } from './capture-selection';
 import { WorkspaceComponent } from './workspace.component';
 import { BookChapters, Chapter, ReaderService, ReadingPosition } from './reader.service';
@@ -13,9 +15,11 @@ const SELECTION_DELAY_MS = 150;
 
 @Component({
   selector: 'app-reader',
-  imports: [RouterLink, WorkspaceComponent],
+  imports: [RouterLink, WorkspaceComponent, PlayerBarComponent],
   styles: `
     .layout { display: flex; gap: 1rem; align-items: flex-start; }
+    /* Room for the fixed player bar, so the end of the text is not hidden behind it. */
+    .layout.with-player { --player-space: 6rem; padding-bottom: var(--player-space); }
     nav { min-width: 14rem; max-width: 18rem; }
     nav button.current { font-weight: bold; }
     article { margin: 0 auto; font-size: var(--reader-font-size, 1rem); max-width: var(--reader-width, 45rem); }
@@ -55,7 +59,10 @@ const SELECTION_DELAY_MS = 150;
       @if (appearance.saveError()) {
         <p role="alert">{{ appearance.saveError() }}</p>
       }
-      <div class="layout">
+      @if (audioError()) {
+        <p role="alert">{{ audioError() }}</p>
+      }
+      <div class="layout" [class.with-player]="!!audioFile()">
         @if (panelOpen()) {
           <nav>
             @for (c of book()!.chapters; track c.index) {
@@ -84,11 +91,15 @@ const SELECTION_DELAY_MS = 150;
         </article>
         </app-workspace>
       </div>
+      @if (audioFile(); as file) {
+        <app-player-bar [src]="audio.contentUrl(bookId(), file.id)" />
+      }
     }
   `,
 })
 export class ReaderComponent {
   private readonly api = inject(ReaderService);
+  protected readonly audio = inject(AudioService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
@@ -102,7 +113,7 @@ export class ReaderComponent {
   private readonly injector = inject(Injector);
   private readonly host = inject(ElementRef<HTMLElement>);
 
-  private readonly bookId = toSignal(this.route.paramMap.pipe(map((p) => Number(p.get('id')))), { requireSync: true });
+  protected readonly bookId = toSignal(this.route.paramMap.pipe(map((p) => Number(p.get('id')))), { requireSync: true });
   // Zero-based; null when the URL has no ?chapter, which means "resume where I stopped".
   // An invalid value means the first chapter.
   private readonly requestedChapter = toSignal(
@@ -117,6 +128,11 @@ export class ReaderComponent {
   protected readonly book = signal<BookChapters | null>(null);
   protected readonly chapter = signal<Chapter | null>(null);
   protected readonly error = signal('');
+  protected readonly audioError = signal(''); // a failed audio list; the book stays readable without the player
+  private readonly audioFiles = signal<AudioFile[]>([]);
+  // The file whose chapter range covers the open chapter (ranges never overlap); none means no player.
+  protected readonly audioFile = computed(() =>
+    this.audioFiles().find((a) => a.fromChapter <= this.chapterIndex() && this.chapterIndex() <= a.toChapter) ?? null);
   protected readonly positionError = signal(''); // a failed save of the reading position; the book stays readable
   protected readonly lastIndex = computed(() => (this.book()?.chapters.length ?? 1) - 1);
   // Closed by default on narrow screens (matchMedia is missing in some test environments).
@@ -189,6 +205,7 @@ export class ReaderComponent {
         if (token !== this.loadToken) return;
         this.book.set(book);
         this.loadedBookId = bookId;
+        void this.loadAudio(bookId);
       }
       // Without ?chapter, resume at the saved position; a failed or invalid one falls back to the top of chapter 0.
       let start: ReadingPosition = { chapterIndex: requested ?? 0, paragraphIndex: 0 };
@@ -226,6 +243,18 @@ export class ReaderComponent {
       if (token !== this.loadToken) return;
       this.loadedBookId = null;
       this.error.set(reportError('Could not load this book or chapter.', e));
+    }
+  }
+
+  // Guarded by the book (not the load token): a chapter switch must not discard the list.
+  private async loadAudio(bookId: number): Promise<void> {
+    this.audioFiles.set([]);
+    this.audioError.set('');
+    try {
+      const files = await this.audio.list(bookId);
+      if (this.bookId() === bookId) this.audioFiles.set(files);
+    } catch (e) {
+      if (this.bookId() === bookId) this.audioError.set(reportError('Could not load the audio files of this book.', e));
     }
   }
 
