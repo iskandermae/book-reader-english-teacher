@@ -52,6 +52,18 @@ public record ChapterResponse(int BookId, int Index, string Title, List<string> 
 /// <param name="ParagraphIndex">Paragraph index inside the chapter (array position in the chapter response).</param>
 public record ReadingPositionDto(int ChapterIndex, int ParagraphIndex);
 
+/// <summary>A paragraph that contains the searched phrase. Both indexes are zero-based and match the chapter response.</summary>
+/// <param name="ChapterIndex">Chapter index.</param>
+/// <param name="ChapterTitle">Chapter title.</param>
+/// <param name="ParagraphIndex">Paragraph index inside the chapter.</param>
+/// <param name="Snippet">Text around the match (about 100 characters each side, cut at word edges).</param>
+public record SearchMatchResponse(int ChapterIndex, string ChapterTitle, int ParagraphIndex, string Snippet);
+
+/// <summary>Search result of one book.</summary>
+/// <param name="Matches">Matches in book order, at most 50.</param>
+/// <param name="HasMore">True when more matches exist than the ones returned.</param>
+public record SearchResponse(List<SearchMatchResponse> Matches, bool HasMore);
+
 /// <summary>File names to put in natural order.</summary>
 /// <param name="Names">The names, in any order.</param>
 public record SortNamesRequest(List<string> Names);
@@ -103,6 +115,35 @@ public class BooksController(IBookImportService importService, IBookLibraryServi
         return chapter is null
             ? NotFound()
             : new ChapterResponse(chapter.BookId, chapter.Index, chapter.Title, chapter.Paragraphs);
+    }
+
+    /// <summary>
+    /// Searches one book for a phrase. Case, punctuation, extra spaces and apostrophes inside words are ignored;
+    /// the words must appear in order, next to each other, inside one paragraph.
+    /// </summary>
+    /// <param name="id">Book id.</param>
+    /// <param name="q">The phrase; at least 2 characters after trimming.</param>
+    /// <param name="ct">Cancels the request.</param>
+    /// <response code="200">Up to 50 matches in book order, and a flag telling whether more exist.</response>
+    /// <response code="400">The query is shorter than 2 characters after trimming.</response>
+    /// <response code="404">No book with this id.</response>
+    [HttpGet("{id:int}/search")]
+    [ProducesResponseType<SearchResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<SearchResponse>> Search(int id, [FromQuery] string? q, CancellationToken ct)
+    {
+        var query = q?.Trim() ?? "";
+        if (query.Length < IBookLibraryService.MinSearchQueryLength)
+            return Problem(detail: $"The search text must have at least {IBookLibraryService.MinSearchQueryLength} characters.",
+                statusCode: StatusCodes.Status400BadRequest);
+
+        var result = await library.SearchAsync(id, query, ct);
+        return result is null
+            ? NotFound()
+            : new SearchResponse(
+                result.Matches.Select(m => new SearchMatchResponse(m.ChapterIndex, m.ChapterTitle, m.ParagraphIndex, m.Snippet)).ToList(),
+                result.HasMore);
     }
 
     /// <summary>Gets where the reader stopped in a book; chapter 0, paragraph 0 when nothing is saved. Does not change the last-opened time.</summary>

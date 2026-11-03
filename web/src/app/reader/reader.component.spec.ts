@@ -38,9 +38,9 @@ describe('ReaderComponent', () => {
   afterEach(() => consoleError.mockRestore());
 
   type Mock = ReturnType<typeof vi.fn>;
-  let api: { chapters: Mock; chapter: Mock; position: Mock; savePosition: Mock };
+  let api: { chapters: Mock; chapter: Mock; position: Mock; savePosition: Mock; search: Mock };
   let settings: { load: Mock; save: Mock };
-  let audio: { list: Mock; contentUrl: Mock };
+  let audio: { list: Mock; contentUrl: Mock; savePosition: Mock };
   const observer = () => FakeObserver.instances[FakeObserver.instances.length - 1];
 
   beforeEach(() => {
@@ -50,11 +50,13 @@ describe('ReaderComponent', () => {
     FakeObserver.instances = [];
     vi.stubGlobal('IntersectionObserver', FakeObserver);
     settings = { load: vi.fn().mockResolvedValue({}), save: vi.fn().mockResolvedValue({}) };
-    audio = { list: vi.fn().mockResolvedValue([]), contentUrl: vi.fn((b: number, a: number) => `/api/books/${b}/audio/${a}/content`) };
+    audio = { list: vi.fn().mockResolvedValue([]), contentUrl: vi.fn((b: number, a: number) => `/api/books/${b}/audio/${a}/content`),
+      savePosition: vi.fn().mockResolvedValue(undefined) };
     api = {
       chapters: vi.fn().mockResolvedValue({ title: 'My Book', chapters }),
       position: vi.fn().mockResolvedValue({ chapterIndex: 0, paragraphIndex: 0 }),
       savePosition: vi.fn().mockResolvedValue(undefined),
+      search: vi.fn(),
       chapter: vi.fn((_id: number, index: number): Promise<Chapter> =>
         Promise.resolve({ title: `Chapter ${index}`, paragraphs: [`first ${index}`, `second ${index}`] })),
     };
@@ -395,11 +397,68 @@ describe('ReaderComponent', () => {
       expect(el.querySelector('.layout')!.classList).toContain('with-player');
     });
 
-    it('shows no player when the chapter is not covered or the book has no audio', async () => {
+    type Harness = Awaited<ReturnType<typeof open>>['harness'];
+    const bars = (harness: Harness) => harness.fixture.debugElement.queryAll(By.directive(PlayerBarComponent));
+    // Pretends the player of file 7 restored its position and was then moved to 5 s (jsdom loads no media).
+    const listenTo5s = (harness: Harness) => {
+      const bar = bars(harness)[0];
+      (bar.componentInstance as { positionRestored: boolean }).positionRestored = true;
+      bar.nativeElement.querySelector('audio').currentTime = 5;
+    };
+    const goNext = async (harness: Harness, el: HTMLElement) => {
+      button(el, 'Next').click();
+      await harness.fixture.whenStable();
+      harness.detectChanges();
+    };
+
+    it('shows "No audio for this chapter" instead of the player when the book has audio but not for this chapter', async () => {
       audio.list.mockResolvedValue([file(7, 1, 2)]);
       const { el } = await open('/books/5?chapter=0');
       expect(player(el)).toBeNull();
+      expect(el.querySelector('.no-audio')!.textContent).toContain('No audio for this chapter');
+      expect(el.querySelector('.layout')!.classList).toContain('with-player');
+    });
+
+    it('shows neither player nor message, and reserves no space, when the book has no audio', async () => {
+      const { el } = await open('/books/5?chapter=0');
+      expect(player(el)).toBeNull();
+      expect(el.querySelector('.no-audio')).toBeNull();
       expect(el.querySelector('.layout')!.classList).not.toContain('with-player');
+    });
+
+    it('keeps the same player instance when the next chapter is covered by the same file', async () => {
+      audio.list.mockResolvedValue([file(7, 0, 1)]);
+      const { harness, el } = await open('/books/5?chapter=0');
+      const before = bars(harness)[0].componentInstance;
+      await goNext(harness, el);
+      expect(bars(harness)).toHaveLength(1);
+      expect(bars(harness)[0].componentInstance).toBe(before);
+    });
+
+    it('creates a new paused player (and destroys the old one, which saves) when a different file covers the chapter', async () => {
+      audio.list.mockResolvedValue([file(7, 0, 0), file(8, 1, 1, 12)]);
+      const { harness, el } = await open('/books/5?chapter=0');
+      const before = bars(harness)[0].componentInstance;
+      listenTo5s(harness);
+      await goNext(harness, el);
+      expect(audio.savePosition).toHaveBeenCalledExactlyOnceWith(5, 7, 5);
+      const after = bars(harness)[0].componentInstance as PlayerBarComponent;
+      expect(after).not.toBe(before);
+      expect([after.audioId(), after.startPosition()]).toEqual([8, 12]);
+      expect(bars(harness)[0].nativeElement.querySelector('audio').paused).toBe(true);
+    });
+
+    it('removes the player, keeps the message, and brings the player back for a covered chapter', async () => {
+      audio.list.mockResolvedValue([file(7, 0, 0), file(8, 2, 2)]);
+      const { harness, el } = await open('/books/5?chapter=0');
+      listenTo5s(harness);
+      await goNext(harness, el);
+      expect(audio.savePosition).toHaveBeenCalledExactlyOnceWith(5, 7, 5);
+      expect(player(el)).toBeNull();
+      expect(el.querySelector('.no-audio')).not.toBeNull();
+      await goNext(harness, el);
+      expect(bars(harness)).toHaveLength(1);
+      expect(el.querySelector('.no-audio')).toBeNull();
     });
 
     it('shows a message, and still the text, when the audio list fails', async () => {
@@ -408,6 +467,71 @@ describe('ReaderComponent', () => {
       expect(el.querySelector('[role=alert]')!.textContent).toContain('audio down');
       expect(paragraphs(el)).toEqual(['first 0', 'second 0']);
       expect(consoleError).toHaveBeenCalled();
+    });
+  });
+
+  describe('search', () => {
+    const hit = { chapterIndex: 2, paragraphIndex: 1, chapterTitle: 'Chapter 2', snippet: 'second 2' };
+    const highlighted = (el: HTMLElement) => Array.from(el.querySelectorAll('article p.search-hit')).map((p) => p.textContent);
+    type Harness = Awaited<ReturnType<typeof open>>['harness'];
+
+    async function settle(harness: Harness) {
+      await harness.fixture.whenStable();
+      harness.detectChanges();
+    }
+
+    async function searchFor(el: HTMLElement, harness: Harness, text: string) {
+      const input = el.querySelector('input[type=search]') as HTMLInputElement;
+      input.value = text;
+      input.dispatchEvent(new Event('input'));
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+      await settle(harness);
+    }
+
+    async function searchAndPick(el: HTMLElement, harness: Harness) {
+      api.search.mockResolvedValue({ matches: [hit], hasMore: false });
+      await searchFor(el, harness, 'second');
+      el.querySelector<HTMLButtonElement>('li button')!.click();
+      await settle(harness);
+    }
+
+    it('opens the chapter of a result, scrolls to the paragraph and highlights it', async () => {
+      const { harness, el } = await open('/books/5?chapter=0');
+      await searchAndPick(el, harness);
+      expect(api.search).toHaveBeenCalledWith(5, 'second');
+      expect(el.querySelector('h2')!.textContent).toBe('Chapter 2');
+      expect(highlighted(el)).toEqual(['second 2']);
+      expect(vi.mocked(Element.prototype.scrollIntoView).mock.contexts).toContain(el.querySelectorAll('article p')[1]);
+      expect(Element.prototype.scrollIntoView).toHaveBeenLastCalledWith({ block: 'center' });
+      // Real paragraph heights while a hit is shown (see the has-hit style), so the target does not drift.
+      expect(el.querySelector('article')!.classList).toContain('has-hit');
+    });
+
+    it('scrolls and highlights inside the open chapter without reloading it', async () => {
+      const { harness, el } = await open('/books/5?chapter=2');
+      api.chapter.mockClear();
+      await searchAndPick(el, harness);
+      expect(api.chapter).not.toHaveBeenCalled();
+      expect(highlighted(el)).toEqual(['second 2']);
+      expect(Element.prototype.scrollIntoView).toHaveBeenLastCalledWith({ block: 'center' });
+      expect(vi.mocked(Element.prototype.scrollIntoView).mock.contexts.at(-1)).toBe(el.querySelectorAll('article p')[1]);
+    });
+
+    it('clears the highlight when another chapter is opened', async () => {
+      const { harness, el } = await open('/books/5?chapter=0');
+      await searchAndPick(el, harness);
+      button(el, 'Chapter 1').click();
+      await settle(harness);
+      button(el, 'Chapter 2').click();
+      await settle(harness);
+      expect(highlighted(el)).toEqual([]);
+    });
+
+    it('clears the highlight when the search box is emptied', async () => {
+      const { harness, el } = await open('/books/5?chapter=2');
+      await searchAndPick(el, harness);
+      await searchFor(el, harness, '');
+      expect(highlighted(el)).toEqual([]);
     });
   });
 });

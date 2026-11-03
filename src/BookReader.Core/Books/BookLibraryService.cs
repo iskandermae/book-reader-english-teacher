@@ -21,8 +21,26 @@ public record ReadingPosition(int ChapterIndex, int ParagraphIndex);
 
 public enum SavePositionResult { Saved, BookNotFound, ChapterNotFound, ParagraphOutOfRange }
 
+/// <summary>One paragraph that contains the searched phrase (both indexes zero-based).</summary>
+public record SearchMatch(int ChapterIndex, string ChapterTitle, int ParagraphIndex, string Snippet);
+
+/// <summary>Search matches in book order; HasMore is true when more than the limit exist (the extra ones are not returned).</summary>
+public record SearchResult(List<SearchMatch> Matches, bool HasMore);
+
 public interface IBookLibraryService
 {
+    /// <summary>Shortest query (after trimming) that is searched.</summary>
+    const int MinSearchQueryLength = 2;
+
+    /// <summary>Most matches returned by one search.</summary>
+    const int MaxSearchMatches = 50;
+
+    /// <summary>
+    /// Finds the paragraphs containing the query words in order, next to each other (case, punctuation and apostrophes ignored).
+    /// Null when the book is unknown. The caller checks the minimum query length.
+    /// </summary>
+    Task<SearchResult?> SearchAsync(int bookId, string query, CancellationToken ct = default);
+
     /// <summary>Gets the saved position, or 0/0 when none is saved. Null when the book is unknown. Does not touch LastOpenedAt.</summary>
     Task<ReadingPosition?> GetPositionAsync(int bookId, CancellationToken ct = default);
 
@@ -81,6 +99,34 @@ public class BookLibraryService(AppDbContext db, AudioStorage audioStorage) : IB
             })
             .FirstOrDefaultAsync(ct);
         return chapter is null ? null : new ChapterText(bookId, index, chapter.Title, chapter.Paragraphs);
+    }
+
+    public async Task<SearchResult?> SearchAsync(int bookId, string query, CancellationToken ct = default)
+    {
+        if (!await db.Books.AnyAsync(b => b.Id == bookId, ct))
+            return null;
+
+        var queryWords = BookTextSearch.NormalizeWords(query);
+        var matches = new List<SearchMatch>();
+        if (queryWords.Count == 0) // e.g. only punctuation: nothing to look for
+            return new SearchResult(matches, false);
+
+        // Stream paragraphs in book order and stop at the first match past the limit: no index, no full load for common phrases.
+        var paragraphs = db.Paragraphs
+            .Join(db.Chapters.Where(c => c.BookId == bookId), p => p.ChapterId, c => c.Id,
+                (p, c) => new { ChapterIndex = c.Index, ChapterTitle = c.Title, ParagraphIndex = p.Index, p.Text })
+            .OrderBy(p => p.ChapterIndex).ThenBy(p => p.ParagraphIndex)
+            .AsAsyncEnumerable();
+        await foreach (var p in paragraphs.WithCancellation(ct))
+        {
+            var snippet = BookTextSearch.FindSnippet(p.Text, queryWords);
+            if (snippet is null)
+                continue;
+            if (matches.Count == IBookLibraryService.MaxSearchMatches)
+                return new SearchResult(matches, true);
+            matches.Add(new SearchMatch(p.ChapterIndex, p.ChapterTitle, p.ParagraphIndex, snippet));
+        }
+        return new SearchResult(matches, false);
     }
 
     public async Task<ReadingPosition?> GetPositionAsync(int bookId, CancellationToken ct = default)

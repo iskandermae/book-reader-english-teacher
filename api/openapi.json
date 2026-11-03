@@ -915,6 +915,97 @@
         }
       }
     },
+    "/api/books/{id}/search": {
+      "get": {
+        "tags": [
+          "Books"
+        ],
+        "summary": "Searches one book for a phrase. Case, punctuation, extra spaces and apostrophes inside words are ignored;\r\nthe words must appear in order, next to each other, inside one paragraph.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Book id.",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "The phrase; at least 2 characters after trimming.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Up to 50 matches in book order, and a flag telling whether more exist.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The query is shorter than 2 characters after trimming.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No book with this id.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/books/{id}/position": {
       "get": {
         "tags": [
@@ -2419,6 +2510,65 @@
           }
         },
         "description": "The scratchpad text."
+      },
+      "SearchMatchResponse": {
+        "required": [
+          "chapterIndex",
+          "chapterTitle",
+          "paragraphIndex",
+          "snippet"
+        ],
+        "type": "object",
+        "properties": {
+          "chapterIndex": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Chapter index.",
+            "format": "int32"
+          },
+          "chapterTitle": {
+            "type": "string",
+            "description": "Chapter title."
+          },
+          "paragraphIndex": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "Paragraph index inside the chapter.",
+            "format": "int32"
+          },
+          "snippet": {
+            "type": "string",
+            "description": "Text around the match (about 100 characters each side, cut at word edges)."
+          }
+        },
+        "description": "A paragraph that contains the searched phrase. Both indexes are zero-based and match the chapter response."
+      },
+      "SearchResponse": {
+        "required": [
+          "matches",
+          "hasMore"
+        ],
+        "type": "object",
+        "properties": {
+          "matches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SearchMatchResponse"
+            },
+            "description": "Matches in book order, at most 50."
+          },
+          "hasMore": {
+            "type": "boolean",
+            "description": "True when more matches exist than the ones returned."
+          }
+        },
+        "description": "Search result of one book."
       },
       "SortNamesRequest": {
         "required": [

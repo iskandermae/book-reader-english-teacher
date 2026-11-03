@@ -3,6 +3,7 @@ import {
   getApiBooksByIdChapters,
   getApiBooksByIdChaptersByIndex,
   getApiBooksByIdPosition,
+  getApiBooksByIdSearch,
   putApiBooksByIdPosition,
 } from '../api';
 
@@ -26,6 +27,16 @@ export interface ReadingPosition {
   paragraphIndex: number;
 }
 
+export interface SearchMatch extends ReadingPosition {
+  chapterTitle: string;
+  snippet: string;
+}
+
+export interface SearchResult {
+  matches: SearchMatch[];
+  hasMore: boolean;
+}
+
 /** Thin wrapper over the generated client so the reader can be tested without HTTP. */
 @Injectable({ providedIn: 'root' })
 export class ReaderService {
@@ -47,5 +58,18 @@ export class ReaderService {
 
   async savePosition(bookId: number, position: ReadingPosition): Promise<void> {
     await putApiBooksByIdPosition({ path: { id: bookId }, body: position, throwOnError: true });
+  }
+
+  async search(bookId: number, query: string): Promise<SearchResult> {
+    const { data } = await getApiBooksByIdSearch({ path: { id: bookId }, query: { q: query }, throwOnError: true });
+    return {
+      hasMore: data.hasMore,
+      matches: data.matches.map((m) => ({
+        chapterIndex: Number(m.chapterIndex),
+        paragraphIndex: Number(m.paragraphIndex),
+        chapterTitle: m.chapterTitle,
+        snippet: m.snippet,
+      })),
+    };
   }
 }

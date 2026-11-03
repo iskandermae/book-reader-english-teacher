@@ -7,6 +7,7 @@ import { AudioFile, AudioService } from '../audio/audio.service';
 import { PlayerBarComponent } from '../player/player-bar.component';
 import { captureSelection, TextSelection } from './capture-selection';
 import { WorkspaceComponent } from './workspace.component';
+import { BookSearchComponent } from './book-search.component';
 import { BookChapters, Chapter, ReaderService, ReadingPosition } from './reader.service';
 import { reportError } from '../report-error';
 
@@ -15,11 +16,13 @@ const SELECTION_DELAY_MS = 150;
 
 @Component({
   selector: 'app-reader',
-  imports: [RouterLink, WorkspaceComponent, PlayerBarComponent],
+  imports: [RouterLink, WorkspaceComponent, PlayerBarComponent, BookSearchComponent],
   styles: `
     .layout { display: flex; gap: 1rem; align-items: flex-start; }
     /* Room for the fixed player bar, so the end of the text is not hidden behind it. */
     .layout.with-player { --player-space: 6rem; padding-bottom: var(--player-space); }
+    .no-audio { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; margin: 0; padding: 0.5rem 1rem;
+                background: Canvas; color: CanvasText; border-top: 1px solid GrayText; }
     nav { min-width: 14rem; max-width: 18rem; }
     nav button.current { font-weight: bold; }
     article { margin: 0 auto; font-size: var(--reader-font-size, 1rem); max-width: var(--reader-width, 45rem); }
@@ -30,7 +33,11 @@ const SELECTION_DELAY_MS = 150;
     article[data-width=narrow] { --reader-width: 32rem; }
     article[data-width=wide] { --reader-width: 60rem; }
     /* A chapter is rendered whole; the browser skips layout/paint of off-screen paragraphs. */
+    article p.search-hit { background: Mark; color: MarkText; }
     article p { content-visibility: auto; contain-intrinsic-size: auto 5rem; }
+    /* While a search hit is shown, paragraphs are laid out with their real height. With the 5rem estimates the
+       paragraphs above the hit change size after the jump and the hit drifts out of view. */
+    article.has-hit p { content-visibility: visible; }
   `,
   template: `
     <a routerLink="/">Back to library</a>
@@ -41,6 +48,7 @@ const SELECTION_DELAY_MS = 150;
     } @else {
       <h1>{{ book()!.title }}</h1>
       <button type="button" (click)="panelOpen.set(!panelOpen())">Chapters</button>
+      <app-book-search [bookId]="bookId()" (picked)="jumpTo($event)" (cleared)="highlight.set(null)" />
       <fieldset>
         <legend>Appearance</legend>
         @for (c of controls; track c.key) {
@@ -62,7 +70,7 @@ const SELECTION_DELAY_MS = 150;
       @if (audioError()) {
         <p role="alert">{{ audioError() }}</p>
       }
-      <div class="layout" [class.with-player]="!!audioFile()">
+      <div class="layout" [class.with-player]="hasAudio()">
         @if (panelOpen()) {
           <nav>
             @for (c of book()!.chapters; track c.index) {
@@ -75,7 +83,7 @@ const SELECTION_DELAY_MS = 150;
           </nav>
         }
         <app-workspace [selection]="selection()" [resetKey]="chapter()">
-        <article [attr.data-font]="appearance.values()['reader.fontSize']" [attr.data-width]="appearance.values()['reader.width']">
+        <article [class.has-hit]="hasHit()" [attr.data-font]="appearance.values()['reader.fontSize']" [attr.data-width]="appearance.values()['reader.width']">
           @if (chapter(); as chapter) {
           <h2>{{ chapter.title }}</h2>
           <button type="button" [disabled]="chapterIndex() <= 0" (click)="open(chapterIndex() - 1)">Previous</button>
@@ -83,7 +91,7 @@ const SELECTION_DELAY_MS = 150;
             Next
           </button>
           @for (p of chapter.paragraphs; track $index) {
-            <p>{{ p }}</p>
+            <p [class.search-hit]="isHit($index)">{{ p }}</p>
           }
           } @else {
             <p>Loading...</p>
@@ -91,9 +99,14 @@ const SELECTION_DELAY_MS = 150;
         </article>
         </app-workspace>
       </div>
-      @if (audioFile(); as file) {
+      <!-- Tracked by file id: a new file gets a new player (it saves the old position and restores the new one). -->
+      @for (file of playerFiles(); track file.id) {
         <app-player-bar [src]="audio.contentUrl(bookId(), file.id)" [bookId]="bookId()" [audioId]="file.id"
                         [startPosition]="file.positionSeconds" />
+      } @empty {
+        @if (hasAudio()) {
+          <p class="no-audio" role="status">No audio for this chapter</p>
+        }
       }
     }
   `,
@@ -132,12 +145,22 @@ export class ReaderComponent {
   protected readonly audioError = signal(''); // a failed audio list; the book stays readable without the player
   private readonly audioFiles = signal<AudioFile[]>([]);
   // The file whose chapter range covers the open chapter (ranges never overlap); none means no player.
-  protected readonly audioFile = computed(() =>
+  private readonly audioFile = computed(() =>
     this.audioFiles().find((a) => a.fromChapter <= this.chapterIndex() && this.chapterIndex() <= a.toChapter) ?? null);
+  // Zero or one file, as a list so the template can track the player by file id.
+  protected readonly playerFiles = computed(() => {
+    const file = this.audioFile();
+    return file ? [file] : [];
+  });
+  // Bar or "no audio" message: shown (and space reserved) whenever the book has any audio.
+  protected readonly hasAudio = computed(() => this.audioFiles().length > 0);
   protected readonly positionError = signal(''); // a failed save of the reading position; the book stays readable
   protected readonly lastIndex = computed(() => (this.book()?.chapters.length ?? 1) - 1);
   // Closed by default on narrow screens (matchMedia is missing in some test environments).
   protected readonly panelOpen = signal(window.matchMedia?.('(min-width: 800px)').matches ?? true);
+
+  // The paragraph picked in the search results; shown highlighted while its chapter is open.
+  protected readonly highlight = signal<ReadingPosition | null>(null);
 
   // The text currently selected inside the chapter; null when nothing usable is selected.
   protected readonly selection = signal<TextSelection | null>(null);
@@ -181,6 +204,25 @@ export class ReaderComponent {
     void this.router.navigate([], { queryParams: { chapter: index }, queryParamsHandling: 'merge' });
   }
 
+  protected readonly hasHit = computed(() => this.highlight()?.chapterIndex === this.chapterIndex());
+
+  protected isHit(paragraphIndex: number): boolean {
+    return this.hasHit() && this.highlight()!.paragraphIndex === paragraphIndex;
+  }
+
+  protected jumpTo(target: ReadingPosition): void {
+    this.highlight.set({ chapterIndex: target.chapterIndex, paragraphIndex: target.paragraphIndex });
+    if (target.chapterIndex !== this.chapterIndex()) {
+      this.open(target.chapterIndex); // load() scrolls to the highlighted paragraph once the chapter is shown
+      return;
+    }
+    // Scroll after the render that removes content-visibility, so the position is computed with real heights.
+    afterNextRender(
+      () => this.host.nativeElement.querySelectorAll('article p')[target.paragraphIndex]?.scrollIntoView({ block: 'center' }),
+      { injector: this.injector },
+    );
+  }
+
   private updateSelection(): void {
     const article = this.host.nativeElement.querySelector('article');
     const sel = window.getSelection();
@@ -209,7 +251,9 @@ export class ReaderComponent {
         void this.loadAudio(bookId);
       }
       // Without ?chapter, resume at the saved position; a failed or invalid one falls back to the top of chapter 0.
-      let start: ReadingPosition = { chapterIndex: requested ?? 0, paragraphIndex: 0 };
+      const hit = this.highlight();
+      const chapterIndex = requested ?? 0;
+      let start: ReadingPosition = { chapterIndex, paragraphIndex: hit?.chapterIndex === chapterIndex ? hit.paragraphIndex : 0 };
       let resuming = false;
       if (requested === null) {
         start = await this.api.position(bookId).catch((e) => {
@@ -230,6 +274,8 @@ export class ReaderComponent {
       }
       if (token !== this.loadToken) return;
       this.chapterIndex.set(start.chapterIndex);
+      // Opening any other chapter drops the highlight.
+      if (this.highlight()?.chapterIndex !== start.chapterIndex) this.highlight.set(null);
       this.chapter.set(chapter);
       // An explicit chapter change is saved at once (paragraph 0); a resume is already saved.
       if (resuming) this.lastSaved = start;
@@ -265,7 +311,8 @@ export class ReaderComponent {
     this.stopObserving();
     // A saved paragraph beyond the chapter's end (e.g. the book changed) means the top.
     const target = start.paragraphIndex < paragraphs.length ? start.paragraphIndex : 0;
-    if (target > 0) paragraphs[target].scrollIntoView();
+    if (this.isHit(target)) paragraphs[target].scrollIntoView({ block: 'center' });
+    else if (target > 0) paragraphs[target].scrollIntoView();
     else window.scrollTo(0, 0);
     this.currentParagraph = target;
     this.visible.clear();

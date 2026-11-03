@@ -137,6 +137,77 @@ describe('PlayerBarComponent', () => {
     expect(consoleError).toHaveBeenCalled();
   });
 
+  describe('hot keys', () => {
+    function press(key: string, init: KeyboardEventInit = {}, target: EventTarget = document.body) {
+      const event = new KeyboardEvent('keydown', { key, ctrlKey: true, bubbles: true, cancelable: true, ...init });
+      target.dispatchEvent(event);
+      return event;
+    }
+
+    it('Ctrl+Left and Ctrl+Right skip 10 s and prevent the browser default', async () => {
+      const { audio } = await create();
+      audio.currentTime = 50;
+      expect(press('ArrowRight').defaultPrevented).toBe(true);
+      expect(audio.currentTime).toBe(60);
+      press('ArrowLeft');
+      expect(audio.currentTime).toBe(50);
+    });
+
+    it('Ctrl+Space toggles play/pause, once per key press', async () => {
+      const { audio } = await create();
+      expect(press(' ').defaultPrevented).toBe(true);
+      expect(play).toHaveBeenCalledTimes(1);
+      press(' ', { repeat: true });
+      expect(play).toHaveBeenCalledTimes(1);
+      Object.defineProperty(audio, 'paused', { value: false, configurable: true });
+      press(' ');
+      expect(pause).toHaveBeenCalledTimes(1);
+    });
+
+    it('saves the position like the buttons', async () => {
+      const { audio } = await create();
+      audio.currentTime = 50;
+      press('ArrowRight');
+      expect(audioApi.savePosition).toHaveBeenCalledWith(3, 9, 60);
+    });
+
+    it('is ignored in text fields, with other modifiers, without Ctrl and for other keys', async () => {
+      const { audio } = await create();
+      audio.currentTime = 50;
+      for (const tag of ['input', 'textarea', 'select']) {
+        const field = document.body.appendChild(document.createElement(tag));
+        expect(press('ArrowRight', {}, field).defaultPrevented).toBe(false);
+        field.remove();
+      }
+      const editable = document.body.appendChild(document.createElement('div'));
+      // jsdom does not implement isContentEditable.
+      Object.defineProperty(editable, 'isContentEditable', { value: true });
+      press('ArrowRight', {}, editable);
+      editable.remove();
+      press('ArrowRight', { shiftKey: true });
+      press('ArrowRight', { altKey: true });
+      press('ArrowRight', { ctrlKey: false });
+      press('a');
+      expect(audio.currentTime).toBe(50);
+      expect(play).not.toHaveBeenCalled();
+    });
+
+    it('stops listening when the player is destroyed', async () => {
+      const { fixture, audio } = await create();
+      audio.currentTime = 50;
+      fixture.destroy();
+      expect(press('ArrowRight').defaultPrevented).toBe(false);
+      expect(audio.currentTime).toBe(50);
+    });
+
+    it('shows the shortcuts in the button tooltips', async () => {
+      const { button } = await create();
+      expect(button('-10 s').title).toBe('Ctrl+Left');
+      expect(button('Play').title).toBe('Ctrl+Space');
+      expect(button('+10 s').title).toBe('Ctrl+Right');
+    });
+  });
+
   describe('remembering the position', () => {
     // Plays the element at `time` and fires the browser's timeupdate.
     function tick(audio: HTMLAudioElement, time: number) {

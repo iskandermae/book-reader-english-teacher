@@ -42,12 +42,48 @@ Assumptions (PM defaults, user may change): position is stored in the DB as a fi
 - Out of scope: switching audio on chapter change (S3.4), syncing text to audio, position per device.
 - Verify: unit tests; browser check (play, reload, position restored).
 
-## S3.4 Switch audio with the chapter — Story — TODO
-**Acceptance**
-- Navigating to another chapter loads the mapped audio file.
-- The player bar is recreated per audio file (e.g. `@for` track by file id), because restore runs once per instance (S3.3 note).
-- Chapters without audio show a clear "no audio" state.
+## S3.4 Switch audio with the chapter — Story — DONE
+Decisions (user, 2026-11-03): a different file loads paused; a chapter without audio shows the bar with a "No audio" message.
+Assumption: a book with no audio files at all shows no bar (no clutter). Frontend only; S3.2 already picks the file by chapter range.
 
-## S3.5 Hot keys — Story — TODO
 **Acceptance**
-- Audio player hot keys for +-10 sec and Play/pause 
+- Opening a chapter covered by the same file as before: playback is not interrupted.
+- Opening a chapter covered by a different file: the player loads that file paused, at its saved position (S3.3). It does not start playing, even if the previous file was playing.
+- The player bar is recreated per audio file (e.g. `@for` track by file id, or equivalent), because position restore runs once per instance. The previous file's position is saved before the switch.
+- Opening a chapter that no file covers, in a book that has audio: the bar stays visible with "No audio for this chapter"; the previous audio stops and its position is saved. Controls are not shown.
+- A book with no audio files shows no bar and no message. The reserved bottom space follows the bar (no bar, no space).
+- Returning to a covered chapter shows the player again.
+- Frontend tests: same file keeps the instance; different file gives a new instance and paused state; no-audio state; no-audio-at-all state; position saved on switch.
+- Out of scope: auto-advance to the next chapter at the end of audio, keyboard shortcuts (S3.5).
+- Verify: unit tests; browser check with 2 files (chapter ranges 0-1 and 2-3) and a gap chapter.
+
+## S3.5 Hot keys — Story — DONE
+Decision (user, 2026-11-03): Ctrl+Left = -10 s, Ctrl+Right = +10 s, Ctrl+Space = play/pause; active whenever the player (with controls) is shown.
+Assumptions (PM defaults): keys are ignored while focus is in a text field (input, textarea, select, contenteditable), because Ctrl+arrows edit text there; Ctrl only (no Cmd); frontend only.
+
+**Acceptance**
+- While the player bar with controls is shown, Ctrl+Left / Ctrl+Right skip -10 s / +10 s, and Ctrl+Space toggles play/pause. Same behaviour (and position saving) as the existing buttons.
+- The browser default for these keys is prevented when handled (no page scroll, no button re-click).
+- Keys do nothing when no player is shown (no audio, "No audio" state), when focus is in a text field, or with extra modifiers (Shift, Alt).
+- Key auto-repeat on Ctrl+Space does not toggle repeatedly.
+- The button tooltips (title) show the shortcut.
+- The listener is removed when the player is destroyed (no duplicates after a file switch).
+- Frontend tests: each key, ignored in text field, ignored with Shift/Alt, repeat ignored, no player, listener cleanup.
+- Out of scope: configurable keys, other shortcuts, Cmd on Mac.
+- Verify: unit tests; browser check (keys work, typing in settings/workspace fields is not affected).
+
+## S3.6 Search — Story — DONE
+User story: I listen to a phrase in the audiobook, then I want a search text box to find the chapter/paragraph.
+Decisions (user, 2026-11-03): search the current book only; match words ignoring case and punctuation; picking a result jumps to the chapter and highlights the paragraph.
+Assumptions (PM defaults): a phrase is found only inside one paragraph; the whole paragraph is highlighted (not the words); max 50 results; query shorter than 2 characters is not searched.
+
+**Acceptance**
+- Backend: `GET /api/books/{id}/search?q=...` returns matches `{chapterIndex, chapterTitle, paragraphIndex, snippet}` in book order, at most 50, plus a flag if more exist. Unknown book gives 404. Query under 2 characters (after trimming) gives 400 with a clear message.
+- Matching: text and query are normalized: case-insensitive, punctuation and extra whitespace ignored, apostrophes inside words dropped (so "don't" and "dont" both match). The query words must appear in the same order, next to each other, inside one paragraph. `openapi.json` regenerated.
+- The snippet is a short text around the match (about 100 characters each side, cut at word edges).
+- Reader page has a search box. Typing (debounced) or pressing Enter shows the results list: chapter title + snippet; "No results" state; "showing first 50" note when more exist; error message when the search fails.
+- Picking a result opens that chapter, scrolls to the paragraph and highlights it. The highlight is cleared when another chapter is opened or the search is cleared.
+- Search does not interfere with the audio hot keys (S3.5 already ignores text fields) or the text selection panel.
+- Backend unit tests: normalization (case, punctuation, apostrophe, spaces), phrase order, multi-paragraph/chapter results, limit and flag, short query, unknown book. Frontend tests: search box, results, empty/error/limit states, jump + highlight, highlight cleared.
+- Out of scope: searching all books, fuzzy matching, search inside audio, highlighting words, full-text index.
+- Verify: unit tests; browser check (search a phrase from the book, pick a result, paragraph highlighted).

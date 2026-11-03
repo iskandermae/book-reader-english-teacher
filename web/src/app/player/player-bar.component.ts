@@ -1,4 +1,4 @@
-import { Component, ElementRef, inject, input, OnDestroy, OnInit, signal, viewChild } from '@angular/core';
+import { Component, ElementRef, HostListener, inject, input, OnDestroy, OnInit, signal, viewChild } from '@angular/core';
 import { AudioService } from '../audio/audio.service';
 import { reportError } from '../report-error';
 import { PLAYER_SPEEDS, DEFAULT_SPEED, PlayerSpeedService } from './player-speed.service';
@@ -8,6 +8,11 @@ const SKIP_SECONDS = 10;
 const SAVE_INTERVAL_MS = 5000;
 /** A saved position this close to the end (or the end itself) means "listened to the end": start again from 0. */
 const RESTART_WITHIN_SECONDS = 2;
+
+/** Ctrl+arrows edit text in these, so the player keys must leave them alone. */
+function isTextField(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
+}
 
 /** Fixed bar at the bottom of the page: play/pause, seek, skip and speed for one audio source. */
 @Component({
@@ -27,9 +32,9 @@ const RESTART_WITHIN_SECONDS = 2;
       <p role="alert">{{ error() }}</p>
     }
     <div class="controls" role="group" aria-label="Audio player">
-      <button type="button" (click)="skip(-skipSeconds)" [attr.aria-label]="'Back ' + skipSeconds + ' seconds'">-{{ skipSeconds }} s</button>
-      <button type="button" (click)="toggle()">{{ playing() ? 'Pause' : 'Play' }}</button>
-      <button type="button" (click)="skip(skipSeconds)" [attr.aria-label]="'Forward ' + skipSeconds + ' seconds'">+{{ skipSeconds }} s</button>
+      <button type="button" (click)="skip(-skipSeconds)" [attr.aria-label]="'Back ' + skipSeconds + ' seconds'" title="Ctrl+Left">-{{ skipSeconds }} s</button>
+      <button type="button" (click)="toggle()" title="Ctrl+Space">{{ playing() ? 'Pause' : 'Play' }}</button>
+      <button type="button" (click)="skip(skipSeconds)" [attr.aria-label]="'Forward ' + skipSeconds + ' seconds'" title="Ctrl+Right">+{{ skipSeconds }} s</button>
       <span>{{ format(current()) }}</span>
       <input type="range" aria-label="Seek" min="0" [max]="duration()" step="1" [value]="current()"
              (input)="seek($any($event.target).valueAsNumber)" />
@@ -76,6 +81,22 @@ export class PlayerBarComponent implements OnInit, OnDestroy {
       // Playback still works at normal speed.
       this.error.set(reportError('Could not load your saved playback speed. Normal speed is used.', e));
     }
+  }
+
+  /**
+   * Ctrl+Left / Ctrl+Right skip, Ctrl+Space toggles. Same handlers as the buttons, so position saving is identical.
+   * HostListener is removed with the component, so the keys only work while the bar is shown.
+   */
+  @HostListener('document:keydown', ['$event'])
+  protected onKeydown(event: KeyboardEvent): void {
+    if (!event.ctrlKey || event.shiftKey || event.altKey || event.metaKey || isTextField(event.target)) return;
+    if (event.key === 'ArrowLeft') this.skip(-SKIP_SECONDS);
+    else if (event.key === 'ArrowRight') this.skip(SKIP_SECONDS);
+    else if (event.key === ' ') {
+      // Held keys repeat: toggle once only.
+      if (!event.repeat) void this.toggle();
+    } else return;
+    event.preventDefault();
   }
 
   protected async toggle(): Promise<void> {
