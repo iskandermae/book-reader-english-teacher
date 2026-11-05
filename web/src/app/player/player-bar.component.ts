@@ -1,6 +1,7 @@
 import { Component, ElementRef, HostListener, inject, input, OnDestroy, OnInit, signal, viewChild } from '@angular/core';
 import { AudioService } from '../audio/audio.service';
 import { reportError } from '../report-error';
+import { isTextField } from './text-field';
 import { PLAYER_SPEEDS, DEFAULT_SPEED, PlayerSpeedService } from './player-speed.service';
 
 const SKIP_SECONDS = 10;
@@ -9,17 +10,11 @@ const SAVE_INTERVAL_MS = 5000;
 /** A saved position this close to the end (or the end itself) means "listened to the end": start again from 0. */
 const RESTART_WITHIN_SECONDS = 2;
 
-/** Ctrl+arrows edit text in these, so the player keys must leave them alone. */
-function isTextField(target: EventTarget | null): boolean {
-  return target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
-}
-
-/** Fixed bar at the bottom of the page: play/pause, seek, skip and speed for one audio source. */
+/** Play/pause, seek, skip and speed for one audio source. The host places it (the reader's bottom bar). */
 @Component({
   selector: 'app-player-bar',
   styles: `
-    :host { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; display: block; padding: 0.5rem 1rem;
-            background: Canvas; color: CanvasText; border-top: 1px solid GrayText; }
+    :host { display: block; flex: 1; }
     .controls { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
     input[type=range] { flex: 1; min-width: 8rem; }
   `,
@@ -111,6 +106,11 @@ export class PlayerBarComponent implements OnInit, OnDestroy {
     } catch (e) {
       this.error.set(reportError('Could not play this audio.', e));
     }
+  }
+
+  /** Called by the host when something else needs the sound, e.g. a voice recording starts. */
+  pause(): void {
+    this.audio().nativeElement.pause();
   }
 
   protected skip(seconds: number): void {

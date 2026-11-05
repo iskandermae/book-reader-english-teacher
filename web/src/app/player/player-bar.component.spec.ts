@@ -298,4 +298,11 @@ describe('PlayerBarComponent', () => {
       expect(audioApi.savePosition).toHaveBeenCalledWith(3, 9, 100);
     });
   });
+
+  it('pauses the audio when the host asks (a recording starts)', async () => {
+    const { fixture } = await create();
+    pause.mockClear();
+    fixture.componentInstance.pause();
+    expect(pause).toHaveBeenCalled();
+  });
 });

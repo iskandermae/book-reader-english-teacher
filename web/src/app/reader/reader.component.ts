@@ -1,10 +1,11 @@
-import { afterNextRender, Component, computed, DestroyRef, effect, ElementRef, inject, Injector, signal } from '@angular/core';
+import { afterNextRender, Component, computed, DestroyRef, effect, ElementRef, inject, Injector, signal, viewChild } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { map } from 'rxjs';
 import { APPEARANCE_OPTIONS, AppearanceKey, AppearanceService } from '../appearance/appearance.service';
 import { AudioFile, AudioService } from '../audio/audio.service';
 import { PlayerBarComponent } from '../player/player-bar.component';
+import { RecorderComponent } from '../player/recorder.component';
 import { captureSelection, TextSelection } from './capture-selection';
 import { WorkspaceComponent } from './workspace.component';
 import { BookSearchComponent } from './book-search.component';
@@ -16,13 +17,17 @@ const SELECTION_DELAY_MS = 150;
 
 @Component({
   selector: 'app-reader',
-  imports: [RouterLink, WorkspaceComponent, PlayerBarComponent, BookSearchComponent],
+  imports: [RouterLink, WorkspaceComponent, PlayerBarComponent, RecorderComponent, BookSearchComponent],
   styles: `
     .layout { display: flex; gap: 1rem; align-items: flex-start; }
-    /* Room for the fixed player bar, so the end of the text is not hidden behind it. */
-    .layout.with-player { --player-space: 6rem; padding-bottom: var(--player-space); }
-    .no-audio { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; margin: 0; padding: 0.5rem 1rem;
-                background: Canvas; color: CanvasText; border-top: 1px solid GrayText; }
+    /* Room for the fixed bottom bar, so the end of the text is not hidden behind it. */
+    .layout { --player-space: 6rem; padding-bottom: var(--player-space); }
+    /* Always shown (at least the recorder). The recorder sits outside the player @for, so a chapter or file change
+       does not destroy it and the last take survives. */
+    .bottom-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; display: flex; flex-wrap: wrap; gap: 0.5rem;
+                  align-items: center; padding: 0.5rem 1rem; background: Canvas; color: CanvasText; border-top: 1px solid GrayText; }
+    .no-audio { flex: 1; margin: 0; }
+    app-recorder { margin-left: auto; }
     nav { min-width: 14rem; max-width: 18rem; }
     nav button.current { font-weight: bold; }
     article { margin: 0 auto; font-size: var(--reader-font-size, 1rem); max-width: var(--reader-width, 45rem); }
@@ -70,7 +75,7 @@ const SELECTION_DELAY_MS = 150;
       @if (audioError()) {
         <p role="alert">{{ audioError() }}</p>
       }
-      <div class="layout" [class.with-player]="hasAudio()">
+      <div class="layout">
         @if (panelOpen()) {
           <nav>
             @for (c of book()!.chapters; track c.index) {
@@ -99,15 +104,18 @@ const SELECTION_DELAY_MS = 150;
         </article>
         </app-workspace>
       </div>
-      <!-- Tracked by file id: a new file gets a new player (it saves the old position and restores the new one). -->
-      @for (file of playerFiles(); track file.id) {
-        <app-player-bar [src]="audio.contentUrl(bookId(), file.id)" [bookId]="bookId()" [audioId]="file.id"
-                        [startPosition]="file.positionSeconds" />
-      } @empty {
-        @if (hasAudio()) {
-          <p class="no-audio" role="status">No audio for this chapter</p>
+      <div class="bottom-bar">
+        <!-- Tracked by file id: a new file gets a new player (it saves the old position and restores the new one). -->
+        @for (file of playerFiles(); track file.id) {
+          <app-player-bar [src]="audio.contentUrl(bookId(), file.id)" [bookId]="bookId()" [audioId]="file.id"
+                          [startPosition]="file.positionSeconds" />
+        } @empty {
+          @if (hasAudio()) {
+            <p class="no-audio" role="status">No audio for this chapter</p>
+          }
         }
-      }
+        <app-recorder (started)="player()?.pause()" />
+      </div>
     }
   `,
 })
@@ -152,7 +160,8 @@ export class ReaderComponent {
     const file = this.audioFile();
     return file ? [file] : [];
   });
-  // Bar or "no audio" message: shown (and space reserved) whenever the book has any audio.
+  protected readonly player = viewChild(PlayerBarComponent);
+  // "No audio for this chapter" shows only when the book has audio elsewhere.
   protected readonly hasAudio = computed(() => this.audioFiles().length > 0);
   protected readonly positionError = signal(''); // a failed save of the reading position; the book stays readable
   protected readonly lastIndex = computed(() => (this.book()?.chapters.length ?? 1) - 1);

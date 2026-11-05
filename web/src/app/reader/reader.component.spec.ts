@@ -5,6 +5,7 @@ import { ReaderComponent } from './reader.component';
 import { Chapter, ReaderService } from './reader.service';
 import { By } from '@angular/platform-browser';
 import { AudioService } from '../audio/audio.service';
+import { RecorderComponent } from '../player/recorder.component';
 import { PlayerBarComponent } from '../player/player-bar.component';
 import { SettingsService } from '../settings/settings.service';
 
@@ -394,7 +395,6 @@ describe('ReaderComponent', () => {
       expect(player(el)).not.toBeNull();
       const bar = harness.fixture.debugElement.query(By.directive(PlayerBarComponent)).componentInstance as PlayerBarComponent;
       expect([bar.bookId(), bar.audioId(), bar.startPosition()]).toEqual([5, 8, 33.5]);
-      expect(el.querySelector('.layout')!.classList).toContain('with-player');
     });
 
     type Harness = Awaited<ReturnType<typeof open>>['harness'];
@@ -416,14 +416,31 @@ describe('ReaderComponent', () => {
       const { el } = await open('/books/5?chapter=0');
       expect(player(el)).toBeNull();
       expect(el.querySelector('.no-audio')!.textContent).toContain('No audio for this chapter');
-      expect(el.querySelector('.layout')!.classList).toContain('with-player');
     });
 
-    it('shows neither player nor message, and reserves no space, when the book has no audio', async () => {
+    it('shows only the recorder, without player or message, when the book has no audio', async () => {
       const { el } = await open('/books/5?chapter=0');
       expect(player(el)).toBeNull();
       expect(el.querySelector('.no-audio')).toBeNull();
-      expect(el.querySelector('.layout')!.classList).not.toContain('with-player');
+      expect(el.querySelector('app-recorder')).not.toBeNull();
+    });
+
+    it('keeps the recorder (and the take) when the player is replaced by "No audio for this chapter"', async () => {
+      audio.list.mockResolvedValue([file(7, 0, 0)]);
+      const { harness, el } = await open('/books/5?chapter=0');
+      const recorder = el.querySelector('app-recorder');
+      await goNext(harness, el);
+      expect(player(el)).toBeNull();
+      expect(el.querySelector('app-recorder')).toBe(recorder);
+    });
+
+    it('pauses the player when a recording starts', async () => {
+      audio.list.mockResolvedValue([file(7, 0, 1)]);
+      const { harness } = await open('/books/5?chapter=0');
+      const bar = harness.fixture.debugElement.query(By.directive(PlayerBarComponent)).componentInstance as PlayerBarComponent;
+      const pause = vi.spyOn(bar, 'pause').mockImplementation(() => undefined);
+      harness.fixture.debugElement.query(By.directive(RecorderComponent)).componentInstance.started.emit();
+      expect(pause).toHaveBeenCalled();
     });
 
     it('keeps the same player instance when the next chapter is covered by the same file', async () => {
