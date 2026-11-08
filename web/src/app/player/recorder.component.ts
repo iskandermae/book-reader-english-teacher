@@ -6,8 +6,8 @@ import { isTextField } from './text-field';
 const MIME_TYPES = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4'];
 /** The browser default is low (about 32 kbps in Chrome) and sounds muffled on replay. */
 const BITS_PER_SECOND = 128_000;
-/** Echo cancellation, noise suppression and auto gain are made for calls and distort a voice take. */
-const RAW_MIC = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
+/** Echo cancellation and noise suppression are made for calls and distort a voice take. Auto gain stays on: a raw mic is quiet on replay. */
+const RAW_MIC = { echoCancellation: false, noiseSuppression: false, autoGainControl: true };
 
 /** Recording stays in the browser: only the last take is kept, as a blob URL. Nothing is uploaded. */
 @Component({
@@ -18,15 +18,15 @@ const RAW_MIC = { echoCancellation: false, noiseSuppression: false, autoGainCont
     }
     <span role="group" aria-label="Voice recorder">
       @if (recording()) {
-        <button type="button" (click)="stop()" title="Ctrl+Enter" aria-keyshortcuts="Control+Enter">Stop recording</button>
+        <button type="button" (click)="stop()" title="Shift+Space" aria-keyshortcuts="Shift+Space">Stop recording</button>
       } @else {
-        <button type="button" [disabled]="starting()" (click)="start()" title="Ctrl+Enter" aria-keyshortcuts="Control+Enter">Record</button>
+        <button type="button" [disabled]="starting()" (click)="start()" title="Shift+Space" aria-keyshortcuts="Shift+Space">Record</button>
       }
       @if (takeUrl()) {
         @if (playingTake()) {
-          <button type="button" (click)="stopTake()" title="Ctrl+Up" aria-keyshortcuts="Control+ArrowUp">Stop my recording</button>
+          <button type="button" (click)="stopTake()" title="Shift+Right" aria-keyshortcuts="Shift+ArrowRight">Stop my recording</button>
         } @else {
-          <button type="button" [disabled]="recording()" (click)="playTake()" title="Ctrl+Up" aria-keyshortcuts="Control+ArrowUp">Play my recording</button>
+          <button type="button" [disabled]="recording()" (click)="playTake()" title="Shift+Right" aria-keyshortcuts="Shift+ArrowRight">Play my recording</button>
         }
       }
     </span>
@@ -49,19 +49,19 @@ export class RecorderComponent implements OnDestroy {
   private destroyed = false;
 
   /**
-   * Ctrl+Enter starts / stops recording, Ctrl+ArrowUp plays / stops the take. Same handlers as the buttons.
+   * Shift+Space starts / stops recording, Shift+ArrowRight plays / stops the take. Same handlers as the buttons.
    * The player bar uses Ctrl+Left / Right / Space, so the keys do not clash.
    */
   @HostListener('document:keydown', ['$event'])
   protected onKeydown(event: KeyboardEvent): void {
-    if (!event.ctrlKey || event.shiftKey || event.altKey || event.metaKey || isTextField(event.target)) return;
-    if (event.key === 'Enter') {
+    if (!event.shiftKey || event.ctrlKey || event.altKey || event.metaKey || isTextField(event.target)) return;
+    if (event.key === ' ') {
       // Held keys repeat: act once only. Ignored while the microphone permission is pending.
       if (!event.repeat && !this.starting()) void (this.recording() ? this.stop() : this.start());
-    } else if (event.key === 'ArrowUp') {
+    } else if (event.key === 'ArrowRight') {
       if (!event.repeat && this.takeUrl() && !this.recording()) void (this.playingTake() ? this.stopTake() : this.playTake());
     } else return;
-    // Ctrl+Enter on a focused button would also click it, which must not run the action twice.
+    // Space on a focused button would also click it, which must not run the action twice.
     event.preventDefault();
   }
 

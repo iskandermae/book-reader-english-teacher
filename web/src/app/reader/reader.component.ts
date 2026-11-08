@@ -28,7 +28,12 @@ const SELECTION_DELAY_MS = 150;
                   align-items: center; padding: 0.5rem 1rem; background: Canvas; color: CanvasText; border-top: 1px solid GrayText; }
     .no-audio { flex: 1; margin: 0; }
     app-recorder { margin-left: auto; }
+    /* Stays at the top while the text scrolls; the results list opens over the text. */
+    .tools { position: sticky; top: 0; z-index: 11; background: Canvas; color: CanvasText; padding: 0.25rem 0; display: flex; gap: 1rem; align-items: flex-start; flex-wrap: wrap; }
+    .tools app-book-search { flex: 0 1 22rem; min-width: 12rem; }
+    .tools fieldset { margin: 0; padding: 0.25rem 0.5rem; display: flex; gap: 0.75rem; flex-wrap: wrap; }
     nav { min-width: 14rem; max-width: 18rem; }
+    nav button { width: 100%; text-align: left; }
     nav button.current { font-weight: bold; }
     article { margin: 0 auto; font-size: var(--reader-font-size, 1rem); max-width: var(--reader-width, 45rem); }
     /* Appearance is two attributes on <article>; paragraphs only inherit, so a long chapter costs nothing extra. */
@@ -53,6 +58,7 @@ const SELECTION_DELAY_MS = 150;
     } @else {
       <h1>{{ book()!.title }}</h1>
       <button type="button" (click)="panelOpen.set(!panelOpen())">Chapters</button>
+      <div class="tools">
       <app-book-search [bookId]="bookId()" (picked)="jumpTo($event)" (cleared)="highlight.set(null)" />
       <fieldset>
         <legend>Appearance</legend>
@@ -66,6 +72,7 @@ const SELECTION_DELAY_MS = 150;
           </label>
         }
       </fieldset>
+      </div>
       @if (positionError()) {
         <p role="alert">{{ positionError() }}</p>
       }
@@ -80,8 +87,8 @@ const SELECTION_DELAY_MS = 150;
           <nav>
             @for (c of book()!.chapters; track c.index) {
               <div>
-                <button type="button" [class.current]="c.index === chapterIndex()" (click)="open(c.index)">
-                  {{ c.title }}
+                <button type="button" [class.current]="c.index === chapterIndex()" (click)="open(c.index)" [attr.title]="c.title">
+                  {{ shortTitle(c.title) }}
                 </button>
               </div>
             }
@@ -207,6 +214,11 @@ export class ReaderComponent {
 
   protected choose(key: AppearanceKey, value: string): void {
     void this.appearance.set(key, value);
+  }
+
+  /** Long titles are cut so all chapter buttons stay one width; the full title is in the tooltip. */
+  protected shortTitle(title: string): string {
+    return title.length > 38 ? title.slice(0, 37).trimEnd() + '…' : title;
   }
 
   protected open(index: number): void {

@@ -140,7 +140,7 @@ describe('RecorderComponent', () => {
     const { button, settle } = await create();
     button('Record')!.click();
     await settle();
-    expect(getUserMedia).toHaveBeenCalledWith({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    expect(getUserMedia).toHaveBeenCalledWith({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: true } });
     expect(FakeRecorder.last.options).toEqual({ mimeType: 'audio/webm;codecs=opus', audioBitsPerSecond: 128_000 });
   });
 
@@ -171,39 +171,39 @@ describe('RecorderComponent', () => {
 
   describe('hotkeys', () => {
     const press = (key: string, init: KeyboardEventInit = {}, target: EventTarget = document.body) => {
-      const event = new KeyboardEvent('keydown', { key, ctrlKey: true, bubbles: true, cancelable: true, ...init });
+      const event = new KeyboardEvent('keydown', { key, shiftKey: true, bubbles: true, cancelable: true, ...init });
       target.dispatchEvent(event);
       return event;
     };
 
-    it('Ctrl+Enter starts and stops recording', async () => {
+    it('Shift+Space starts and stops recording', async () => {
       const { button, settle } = await create();
-      expect(press('Enter').defaultPrevented).toBe(true);
+      expect(press(' ').defaultPrevented).toBe(true);
       await settle();
       expect(button('Stop recording')).not.toBeNull();
-      press('Enter');
+      press(' ');
       await settle();
       expect(button('Record')).not.toBeNull();
       expect(button('Play my recording')).not.toBeNull();
     });
 
-    it('Ctrl+ArrowUp plays and stops the take only when one exists and not recording', async () => {
+    it('Shift+ArrowRight plays and stops the take only when one exists and not recording', async () => {
       const { button, settle } = await create();
-      press('ArrowUp');
+      press('ArrowRight');
       expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
 
-      press('Enter');
+      press(' ');
       await settle();
-      press('ArrowUp'); // still recording
+      press('ArrowRight'); // still recording
       expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
-      press('Enter');
+      press(' ');
       await settle();
 
-      press('ArrowUp');
+      press('ArrowRight');
       await settle();
       expect(HTMLMediaElement.prototype.play).toHaveBeenCalledTimes(1);
       expect(button('Stop my recording')).not.toBeNull();
-      press('ArrowUp');
+      press('ArrowRight');
       await settle();
       expect(button('Play my recording')).not.toBeNull();
     });
@@ -211,11 +211,11 @@ describe('RecorderComponent', () => {
     it('ignores key repeat, text fields, other modifiers and the player bar keys', async () => {
       const { settle } = await create();
       const input = document.body.appendChild(document.createElement('input'));
-      expect(press('Enter', { repeat: true }).defaultPrevented).toBe(false);
-      expect(press('Enter', {}, input).defaultPrevented).toBe(false);
-      expect(press('Enter', { shiftKey: true }).defaultPrevented).toBe(false);
-      expect(press('Enter', { ctrlKey: false }).defaultPrevented).toBe(false);
-      for (const key of ['ArrowLeft', 'ArrowRight', ' ']) expect(press(key).defaultPrevented).toBe(false);
+      press(' ', { repeat: true }); // swallowed (no button click), but starts nothing
+      expect(press(' ', {}, input).defaultPrevented).toBe(false);
+      expect(press(' ', { ctrlKey: true }).defaultPrevented).toBe(false);
+      expect(press(' ', { shiftKey: false }).defaultPrevented).toBe(false);
+      for (const key of ['ArrowLeft', 'ArrowUp', 'Enter']) expect(press(key).defaultPrevented).toBe(false);
       await settle();
       expect(getUserMedia).not.toHaveBeenCalled();
       input.remove();

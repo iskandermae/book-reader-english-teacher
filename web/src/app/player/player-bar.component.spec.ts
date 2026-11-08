@@ -144,12 +144,21 @@ describe('PlayerBarComponent', () => {
       return event;
     }
 
-    it('Ctrl+Left and Ctrl+Right skip 10 s and prevent the browser default', async () => {
+    it('Ctrl+Left and Ctrl+Right skip 1 s and prevent the browser default', async () => {
       const { audio } = await create();
       audio.currentTime = 50;
       expect(press('ArrowRight').defaultPrevented).toBe(true);
-      expect(audio.currentTime).toBe(60);
+      expect(audio.currentTime).toBe(51);
       press('ArrowLeft');
+      expect(audio.currentTime).toBe(50);
+    });
+
+    it('Ctrl+Shift+Left and Ctrl+Shift+Right skip 10 s', async () => {
+      const { audio } = await create();
+      audio.currentTime = 50;
+      expect(press('ArrowRight', { shiftKey: true }).defaultPrevented).toBe(true);
+      expect(audio.currentTime).toBe(60);
+      press('ArrowLeft', { shiftKey: true });
       expect(audio.currentTime).toBe(50);
     });
 
@@ -168,7 +177,7 @@ describe('PlayerBarComponent', () => {
       const { audio } = await create();
       audio.currentTime = 50;
       press('ArrowRight');
-      expect(audioApi.savePosition).toHaveBeenCalledWith(3, 9, 60);
+      expect(audioApi.savePosition).toHaveBeenCalledWith(3, 9, 51);
     });
 
     it('is ignored in text fields, with other modifiers, without Ctrl and for other keys', async () => {
@@ -184,7 +193,7 @@ describe('PlayerBarComponent', () => {
       Object.defineProperty(editable, 'isContentEditable', { value: true });
       press('ArrowRight', {}, editable);
       editable.remove();
-      press('ArrowRight', { shiftKey: true });
+      press(' ', { shiftKey: true });
       press('ArrowRight', { altKey: true });
       press('ArrowRight', { ctrlKey: false });
       press('a');
@@ -202,9 +211,11 @@ describe('PlayerBarComponent', () => {
 
     it('shows the shortcuts in the button tooltips', async () => {
       const { button } = await create();
-      expect(button('-10 s').title).toBe('Ctrl+Left');
+      expect(button('-10 s').title).toBe('Ctrl+Shift+Left');
+      expect(button('-1 s').title).toBe('Ctrl+Left');
       expect(button('Play').title).toBe('Ctrl+Space');
-      expect(button('+10 s').title).toBe('Ctrl+Right');
+      expect(button('+1 s').title).toBe('Ctrl+Right');
+      expect(button('+10 s').title).toBe('Ctrl+Shift+Right');
     });
   });
 

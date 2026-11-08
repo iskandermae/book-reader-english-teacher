@@ -8,7 +8,9 @@ Epics 0-3 DONE (history in `doc/pm-state-done.md`). Epic 4 (sync) SKIPPED for no
 ## Next action
 Epics 1-3 committed and browser-tested by user 2026-11-04, all fine.
 Epic 5 rescoped by user 2026-11-04: only S5.1. S5.1 DONE (dev + QA approved 2026-11-04, 219 tests, build ok). Recorder is in the reader's bottom bar. User to check manually in Chrome/Edge with a real mic, then commit.
-Next: Epic 7 (S7.1+). Epic 6 needs sync, blocked. S7.4 likely obsolete.
+S5.2 (hotkeys Ctrl+Enter record, Ctrl+Up play; mic processing off, 128 kbps) DONE: dev + QA approved 2026-11-05, 225 tests, build ok. User to compare replay quality, then commit.
+Decision 2026-11-05: user does NOT need stored recordings (recorder stays in-memory, no save/persist stories).
+Next: groom S7.1 (Epic 7). Epic 6 needs sync, blocked. S7.4 likely obsolete.
 
 ## Commit checklist for the user (Epic 0)
 - Commit `web/package-lock.json`.

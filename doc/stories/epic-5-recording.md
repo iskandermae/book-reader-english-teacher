@@ -19,7 +19,7 @@ Rescoped 2026-11-04 (user): no sync, so no per-sentence practice. Recording is m
 - No backend change, no upload.
 - Unit tests with a mocked `MediaRecorder`/`getUserMedia` (no real mic). Manual check in Chrome and Edge.
 
-## S5.2 Recorder hotkeys and playback quality — Story
+## S5.2 Recorder hotkeys and playback quality — Story — DONE (user manual quality check pending)
 Found by user in manual test 2026-11-05: no hotkeys; replay of the take sounds bad.
 
 **Decisions (defaults, user may change)**
@@ -33,4 +33,4 @@ Found by user in manual test 2026-11-05: no hotkeys; replay of the take sounds b
 - Unit tests with mocks. Manual check: user compares replay quality.
 
 ## Later (not planned)
-Storing recordings per sentence, practice, A/B compare, sentence loop need sync (Epic 4, skipped). Dropped for now: S5.2-S5.5.
+Storing recordings per sentence, practice, A/B compare, sentence loop need sync (Epic 4, skipped). Dropped for now: old S5.2-S5.5 (the S5.2 above is a new story).

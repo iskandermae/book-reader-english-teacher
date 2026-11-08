@@ -5,6 +5,7 @@ import { isTextField } from './text-field';
 import { PLAYER_SPEEDS, DEFAULT_SPEED, PlayerSpeedService } from './player-speed.service';
 
 const SKIP_SECONDS = 10;
+const STEP_SECONDS = 1;
 /** While playing, the position is saved at most this often. */
 const SAVE_INTERVAL_MS = 5000;
 /** A saved position this close to the end (or the end itself) means "listened to the end": start again from 0. */
@@ -27,9 +28,11 @@ const RESTART_WITHIN_SECONDS = 2;
       <p role="alert">{{ error() }}</p>
     }
     <div class="controls" role="group" aria-label="Audio player">
-      <button type="button" (click)="skip(-skipSeconds)" [attr.aria-label]="'Back ' + skipSeconds + ' seconds'" title="Ctrl+Left">-{{ skipSeconds }} s</button>
+      <button type="button" (click)="skip(-skipSeconds)" [attr.aria-label]="'Back ' + skipSeconds + ' seconds'" title="Ctrl+Shift+Left">-{{ skipSeconds }} s</button>
+      <button type="button" (click)="skip(-stepSeconds)" [attr.aria-label]="'Back ' + stepSeconds + ' second'" title="Ctrl+Left">-{{ stepSeconds }} s</button>
       <button type="button" (click)="toggle()" title="Ctrl+Space">{{ playing() ? 'Pause' : 'Play' }}</button>
-      <button type="button" (click)="skip(skipSeconds)" [attr.aria-label]="'Forward ' + skipSeconds + ' seconds'" title="Ctrl+Right">+{{ skipSeconds }} s</button>
+      <button type="button" (click)="skip(stepSeconds)" [attr.aria-label]="'Forward ' + stepSeconds + ' second'" title="Ctrl+Right">+{{ stepSeconds }} s</button>
+      <button type="button" (click)="skip(skipSeconds)" [attr.aria-label]="'Forward ' + skipSeconds + ' seconds'" title="Ctrl+Shift+Right">+{{ skipSeconds }} s</button>
       <span>{{ format(current()) }}</span>
       <input type="range" aria-label="Seek" min="0" [max]="duration()" step="1" [value]="current()"
              (input)="seek($any($event.target).valueAsNumber)" />
@@ -57,6 +60,7 @@ export class PlayerBarComponent implements OnInit, OnDestroy {
 
   protected readonly speeds = PLAYER_SPEEDS;
   protected readonly skipSeconds = SKIP_SECONDS;
+  protected readonly stepSeconds = STEP_SECONDS;
   protected readonly playing = signal(false);
   protected readonly current = signal(0);
   protected readonly duration = signal(0);
@@ -79,15 +83,16 @@ export class PlayerBarComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Ctrl+Left / Ctrl+Right skip, Ctrl+Space toggles. Same handlers as the buttons, so position saving is identical.
+   * Ctrl+Left / Ctrl+Right skip 1 s, Ctrl+Shift+Left / Right skip 10 s, Ctrl+Space toggles. Same handlers as the buttons, so position saving is identical.
    * HostListener is removed with the component, so the keys only work while the bar is shown.
    */
   @HostListener('document:keydown', ['$event'])
   protected onKeydown(event: KeyboardEvent): void {
-    if (!event.ctrlKey || event.shiftKey || event.altKey || event.metaKey || isTextField(event.target)) return;
-    if (event.key === 'ArrowLeft') this.skip(-SKIP_SECONDS);
-    else if (event.key === 'ArrowRight') this.skip(SKIP_SECONDS);
-    else if (event.key === ' ') {
+    if (!event.ctrlKey || event.altKey || event.metaKey || isTextField(event.target)) return;
+    const big = event.shiftKey ? SKIP_SECONDS : STEP_SECONDS;
+    if (event.key === 'ArrowLeft') this.skip(-big);
+    else if (event.key === 'ArrowRight') this.skip(big);
+    else if (event.key === ' ' && !event.shiftKey) {
       // Held keys repeat: toggle once only.
       if (!event.repeat) void this.toggle();
     } else return;

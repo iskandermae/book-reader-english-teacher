@@ -8,11 +8,16 @@ const TYPING_DELAY_MS = 400;
 /** Search box with a results list; picking a result is reported to the reader, which owns navigation. */
 @Component({
   selector: 'app-book-search',
-  // Up to 50 results must not push the text down: the list scrolls inside its own box.
-  styles: `ul { max-height: 40vh; overflow-y: auto; }`,
+  // Up to 50 results must not push the text down: the list floats over it and scrolls inside its own box.
+  styles: `:host { display: block; position: relative; } input { width: 100%; box-sizing: border-box; }
+    .results { position: absolute; left: 0; right: 0; top: 100%; max-height: 50vh; overflow-y: auto; background: Canvas;
+               color: CanvasText; border: 1px solid GrayText; padding: 0.25rem 0.5rem; }
+    .results p { margin: 0.25rem 0; } ul { margin: 0; padding-left: 1rem; }`,
   template: `
     <input type="search" aria-label="Search the book" placeholder="Search the book" [value]="query()"
            (input)="typed($any($event.target).value)" (keydown.enter)="searchNow()" />
+    @if (error() || result()) {
+    <div class="results">
     @if (error()) {
       <p role="alert">{{ error() }}</p>
     } @else if (result(); as r) {
@@ -32,6 +37,8 @@ const TYPING_DELAY_MS = 400;
           <p role="status">Showing first {{ r.matches.length }} results</p>
         }
       }
+    }
+    </div>
     }
   `,
 })
