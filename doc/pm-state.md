@@ -14,6 +14,8 @@ B1 (AI buttons scrolled away; now sticky panel, only result scrolls) DONE: dev +
 B2 (slow first Translate: Ollama keep_alive 30m + background warm-up at startup and on model/url change) DONE: dev + QA approved 2026-11-21, 215 backend tests. User to check real timing (first Translate ~2 s), then commit.
 S2.9 (LLM call log, last 10, in memory, `/llm-log` in new tab) DONE: dev + QA approved 2026-11-21, 220 backend / 232 frontend tests. User to check in browser, then commit (B1, B2, S2.9 are all uncommitted).
 Open: B2 warm-up may not help `-cloud` models (user uses gpt-oss:120b-cloud); first-Translate 18 s cause unconfirmed; waiting for user's timing after restart.
+T1 (run.ps1/run.sh publish API into bin/ and run from there; data in bin/data; ng serve unchanged) DONE: dev + QA approved 2026-11-21. run.sh not run (only bash -n). User to try run.ps1, then commit.
+Agent briefs: if an agent starts the app to check it, use ports other than 5027/4200 and stop it afterwards.
 Next: groom S7.1 (Epic 7). Epic 6 needs sync, blocked. S7.4 likely obsolete.
 
 ## Commit checklist for the user (Epic 0)

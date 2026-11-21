@@ -31,7 +31,7 @@ CI (GitHub Actions, `.github/workflows/ci.yml`) runs all of these on every push.
 AI features need a local Ollama model. The model name is a setting (`ollama.model`, empty by default) and is never hardcoded. Pull a model with `ollama pull <name>` and set its name in the app settings.
 
 ## Data folder
-All app data (database, settings, generated files) is stored in a `data` folder beside the executable. Under `dotnet run` this is `src/BookReader.Api/bin/Debug/net10.0/data`, so it is lost when the project is cleaned.
+All app data (database, settings, generated files) is stored in a `data` folder beside the executable. With `run.ps1`/`run.sh` the API is published into `bin/` and runs from there, so the data is in `bin/data` (git-ignored; the scripts never delete it). Building or testing while the app runs does not lock the files.
 
 ## Tools
 ### Convert PDF to TXT
