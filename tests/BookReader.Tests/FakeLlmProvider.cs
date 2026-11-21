@@ -23,7 +23,16 @@ public sealed class FakeLlmProvider : ILlmProvider
     public Task<IReadOnlyList<string>> ListModelsAsync(CancellationToken ct = default) =>
         Failure is null ? Task.FromResult(Models) : Task.FromException<IReadOnlyList<string>>(Failure);
 
-    public Task WarmUpAsync(CancellationToken ct = default) => Task.CompletedTask;
+    private readonly TaskCompletionSource _warmedUp = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    /// <summary>Completes when <see cref="WarmUpAsync"/> was called.</summary>
+    public Task WarmedUp => _warmedUp.Task;
+
+    public Task WarmUpAsync(CancellationToken ct = default)
+    {
+        _warmedUp.TrySetResult();
+        return Task.CompletedTask;
+    }
 
     public async IAsyncEnumerable<string> GenerateAsync(string prompt, [EnumeratorCancellation] CancellationToken ct = default)
     {

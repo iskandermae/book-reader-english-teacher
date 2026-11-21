@@ -51,7 +51,8 @@ const SELECTION_DELAY_MS = 150;
     article.has-hit p { content-visibility: visible; }
   `,
   template: `
-    <a routerLink="/">Back to library</a>
+    <a routerLink="/">Back to library</a>{{ ' ' }}
+    <a routerLink="/llm-log" target="_blank" rel="noopener">LLM log</a>
     @if (error()) {
       <p role="alert">{{ error() }}</p>
     } @else if (!book()) {

@@ -24,6 +24,7 @@ builder.Services.AddScoped<IScratchpadService, ScratchpadService>();
 builder.Services.AddScoped<LlmExceptionFilter>();
 builder.Services.AddScoped<ILlmProvider, OllamaProvider>();
 builder.Services.AddSingleton<BookReader.Api.LlmWarmUp>();
+builder.Services.AddSingleton<LlmCallLog>();
 builder.Services.AddScoped<IBookImportService, BookImportService>();
 builder.Services.AddScoped<IBookLibraryService, BookLibraryService>();
 builder.Services.AddSingleton(sp => new AudioStorage(dataFolder, sp.GetRequiredService<ILogger<AudioStorage>>()));

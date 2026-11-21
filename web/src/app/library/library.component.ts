@@ -11,6 +11,7 @@ import { reportError } from '../report-error';
   template: `
     <h1>Library</h1>
     <a routerLink="/text">Text</a>{{ ' ' }}
+    <a routerLink="/llm-log" target="_blank" rel="noopener">LLM log</a>{{ ' ' }}
     <a routerLink="/settings">Settings</a>
 
     <form (ngSubmit)="upload()">

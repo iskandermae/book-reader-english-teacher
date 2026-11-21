@@ -12,6 +12,8 @@ S5.2 (hotkeys Ctrl+Enter record, Ctrl+Up play; mic processing off, 128 kbps) DON
 Decision 2026-11-05: user does NOT need stored recordings (recorder stays in-memory, no save/persist stories).
 B1 (AI buttons scrolled away; now sticky panel, only result scrolls) DONE: dev + QA approved 2026-11-21, 226 tests, build ok. User to check in browser, then commit. Known limit: --tools-space is fixed 6.5rem (not measured).
 B2 (slow first Translate: Ollama keep_alive 30m + background warm-up at startup and on model/url change) DONE: dev + QA approved 2026-11-21, 215 backend tests. User to check real timing (first Translate ~2 s), then commit.
+S2.9 (LLM call log, last 10, in memory, `/llm-log` in new tab) DONE: dev + QA approved 2026-11-21, 220 backend / 232 frontend tests. User to check in browser, then commit (B1, B2, S2.9 are all uncommitted).
+Open: B2 warm-up may not help `-cloud` models (user uses gpt-oss:120b-cloud); first-Translate 18 s cause unconfirmed; waiting for user's timing after restart.
 Next: groom S7.1 (Epic 7). Epic 6 needs sync, blocked. S7.4 likely obsolete.
 
 ## Commit checklist for the user (Epic 0)

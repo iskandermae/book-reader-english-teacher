@@ -10,7 +10,7 @@ namespace BookReader.Api.Controllers;
 [ApiController]
 [Route("api/llm")]
 [ServiceFilter<LlmExceptionFilter>]
-public class LlmController(ILlmProvider llm, ISettingsService settings, ICustomActionService actions) : ControllerBase
+public class LlmController(ILlmProvider llm, ISettingsService settings, ICustomActionService actions, LlmCallLog callLog) : ControllerBase
 {
     /// <summary>Checks whether the LLM server (Ollama) is reachable. Always returns 200; a problem is reported in the error field.</summary>
     [HttpGet("status")]
@@ -41,7 +41,7 @@ public class LlmController(ILlmProvider llm, ISettingsService settings, ICustomA
         if (string.IsNullOrWhiteSpace(request.Prompt))
             return BadRequest(new ProblemDetails { Title = "Invalid prompt", Detail = "Prompt must not be empty." });
 
-        return await StreamAsync(request.Prompt, ct);
+        return await StreamAsync("test", request.Prompt, ct);
     }
 
     /// <summary>
@@ -59,7 +59,7 @@ public class LlmController(ILlmProvider llm, ISettingsService settings, ICustomA
         if (IsBlankText(request.Text, out var invalid))
             return invalid;
 
-        return await StreamAsync(await BuildPromptAsync(all => all[SettingsService.PromptTranslate], request.Text, request.Context, request.Paragraph, ct), ct);
+        return await StreamAsync("translate", await BuildPromptAsync(all => all[SettingsService.PromptTranslate], request.Text, request.Context, request.Paragraph, ct), ct);
     }
 
     /// <summary>
@@ -77,7 +77,7 @@ public class LlmController(ILlmProvider llm, ISettingsService settings, ICustomA
         if (IsBlankText(request.Text, out var invalid))
             return invalid;
 
-        return await StreamAsync(await BuildPromptAsync(all => all[SettingsService.PromptExplain], request.Text, request.Context, request.Paragraph, ct), ct);
+        return await StreamAsync("explain", await BuildPromptAsync(all => all[SettingsService.PromptExplain], request.Text, request.Context, request.Paragraph, ct), ct);
     }
 
     /// <summary>
@@ -104,7 +104,7 @@ public class LlmController(ILlmProvider llm, ISettingsService settings, ICustomA
         if (action is null)
             return NotFound(new ProblemDetails { Title = "Action not found", Detail = $"There is no action with id {id}." });
 
-        return await StreamAsync(await BuildPromptAsync(_ => action.Prompt, request.Text, request.Context, request.Paragraph, ct), ct);
+        return await StreamAsync(action.Name, await BuildPromptAsync(_ => action.Prompt, request.Text, request.Context, request.Paragraph, ct), ct);
     }
 
     // Reads the template and languages on every call, so a settings change applies without restart.
@@ -126,31 +126,69 @@ public class LlmController(ILlmProvider llm, ISettingsService settings, ICustomA
         return string.IsNullOrWhiteSpace(text);
     }
 
-    private async Task<IActionResult> StreamAsync(string prompt, CancellationToken ct)
+    // The only place that calls the provider's Generate, so it is also the only place that records the call (story S2.9).
+    private async Task<IActionResult> StreamAsync(string action, string prompt, CancellationToken ct)
     {
-        await using var chunks = llm.GenerateAsync(prompt, ct).GetAsyncEnumerator(ct);
-        // The first MoveNext runs before the response starts, so setup errors still become a clean 400/503 (see LlmExceptionFilter).
-        var hasNext = await chunks.MoveNextAsync();
-
-        Response.ContentType = "text/event-stream";
-        Response.Headers.CacheControl = "no-cache";
+        var started = DateTimeOffset.UtcNow;
+        var timer = System.Diagnostics.Stopwatch.StartNew();
+        var answer = new System.Text.StringBuilder();
+        string? error = null;
+        // Read before the call: it is the model of this call, and a settings failure here must not hide the call's own outcome.
+        var model = (await settings.GetAllAsync(ct))[SettingsService.OllamaModel];
         try
         {
-            while (hasNext)
+            await using var chunks = llm.GenerateAsync(prompt, ct).GetAsyncEnumerator(ct);
+            // The first MoveNext runs before the response starts, so setup errors still become a clean 400/503 (see LlmExceptionFilter).
+            var hasNext = await chunks.MoveNextAsync();
+
+            Response.ContentType = "text/event-stream";
+            Response.Headers.CacheControl = "no-cache";
+            try
             {
-                await WriteEventAsync(null, JsonSerializer.Serialize(chunks.Current), ct);
-                hasNext = await chunks.MoveNextAsync();
+                while (hasNext)
+                {
+                    answer.Append(chunks.Current);
+                    await WriteEventAsync(null, JsonSerializer.Serialize(chunks.Current), ct);
+                    hasNext = await chunks.MoveNextAsync();
+                }
+                await WriteEventAsync("done", "", ct);
             }
-            await WriteEventAsync("done", "", ct);
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // Headers are already sent, so the error travels inside the stream. Unexpected errors get a generic text.
+                error = ErrorText(ex);
+                await WriteEventAsync("error", JsonSerializer.Serialize(error), ct);
+            }
+            return new EmptyResult();
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex)
         {
-            // Headers are already sent, so the error travels inside the stream. Unexpected errors get a generic text.
-            var message = ex is LlmException ? ex.Message : "The AI request failed unexpectedly.";
-            await WriteEventAsync("error", JsonSerializer.Serialize(message), ct);
+            // Setup errors (before the stream) and cancels are rethrown for the filter / host; here they are only noted.
+            error ??= ex is OperationCanceledException ? "Cancelled" : ErrorText(ex);
+            throw;
         }
-        return new EmptyResult();
+        finally
+        {
+            callLog.Add(new LlmCallEntry(started, action, model, prompt, answer.ToString(), timer.ElapsedMilliseconds, error));
+        }
     }
+
+    /// <summary>Returns the last 10 LLM calls (newest first) with full prompt and answer. Kept in memory only; lost on restart.</summary>
+    [HttpGet("log")]
+    [ProducesResponseType<IReadOnlyList<LlmCallEntry>>(StatusCodes.Status200OK)]
+    public IReadOnlyList<LlmCallEntry> GetLog() => callLog.GetAll();
+
+    /// <summary>Clears the LLM call log.</summary>
+    [HttpDelete("log")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public IActionResult ClearLog()
+    {
+        callLog.Clear();
+        return NoContent();
+    }
+
+    // Expected LLM problems have a message safe for the user; anything else gets a generic text.
+    private static string ErrorText(Exception ex) => ex is LlmException ? ex.Message : "The AI request failed unexpectedly.";
 
     private async Task WriteEventAsync(string? name, string data, CancellationToken ct)
     {

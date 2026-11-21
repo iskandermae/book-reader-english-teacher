@@ -170,3 +170,13 @@ Depends on S2.6c. User decision 2026-10-28: Ollama only (no other cloud vendor);
 - Out of scope: other vendors, per-action provider, cache, connection-test button (unless trivial), key encryption (stored as plain setting in the local `data` DB, accepted for a local app).
 **Notes**: a signed-in local Ollama can already run `...-cloud` models through the local mode with no code change; this story is for direct cloud use with a key.
 **Risks**: privacy (text leaves the machine in cloud mode; warned in the UI); key stored unencrypted in the local DB.
+
+## S2.9 LLM call log (last 10) — Story (backend + frontend)
+User request 2026-11-21: see the full request and answer of the last 10 LLM calls, in a separate browser tab, without leaving the reading page.
+Today nothing stores prompts or answers (logs only hold fixed text, by design).
+**Decided 2026-11-21 (user: memory only, full text sent and received incl. system prompt)**:
+- Backend: `LlmCallLog` singleton keeps the last 10 calls in memory (newest first): time, action, model, full prompt, full answer, duration, error text if failed. Recorded in one place around the provider's Generate call. Warm-up calls are not recorded. `GET /api/llm/log` returns the list; `DELETE /api/llm/log` clears it.
+- Frontend: route `/llm-log` (list, expandable entries, Refresh and Clear buttons). A link "LLM log" in the nav opens it with `target="_blank"` so the reading page stays open.
+- Not in scope: saving to disk, search, export.
+**Open questions**: none.
+**Acceptance**: after 12 calls only the last 10 are listed; failed call shows its error; Clear empties the list; link opens a new tab. Tests: fake provider, no network, ring-buffer limit.

@@ -1643,6 +1643,56 @@
         }
       }
     },
+    "/api/llm/log": {
+      "get": {
+        "tags": [
+          "Llm"
+        ],
+        "summary": "Returns the last 10 LLM calls (newest first) with full prompt and answer. Kept in memory only; lost on restart.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LlmCallEntry"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LlmCallEntry"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LlmCallEntry"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Llm"
+        ],
+        "summary": "Clears the LLM call log.",
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
     "/api/scratchpad": {
       "get": {
         "tags": [
@@ -2377,6 +2427,50 @@
           }
         },
         "description": "The imported book."
+      },
+      "LlmCallEntry": {
+        "required": [
+          "time",
+          "action",
+          "model",
+          "prompt",
+          "answer",
+          "durationMs",
+          "error"
+        ],
+        "type": "object",
+        "properties": {
+          "time": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "action": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "answer": {
+            "type": "string"
+          },
+          "durationMs": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "error": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
       },
       "LlmStatus": {
         "required": [
