@@ -21,7 +21,8 @@ const SELECTION_DELAY_MS = 150;
   styles: `
     .layout { display: flex; gap: 1rem; align-items: flex-start; }
     /* Room for the fixed bottom bar, so the end of the text is not hidden behind it. */
-    .layout { --player-space: 6rem; padding-bottom: var(--player-space); }
+    /* --tools-space: room the workspace panel leaves for the sticky .tools bar above it. */
+    .layout { --player-space: 6rem; --tools-space: 6.5rem; padding-bottom: var(--player-space); }
     /* Always shown (at least the recorder). The recorder sits outside the player @for, so a chapter or file change
        does not destroy it and the last take survives. */
     .bottom-bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; display: flex; flex-wrap: wrap; gap: 0.5rem;

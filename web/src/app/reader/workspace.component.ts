@@ -20,20 +20,22 @@ type StreamStarter = (selection: TextSelection, signal: AbortSignal) => AsyncGen
   styles: `
     :host { display: flex; flex: 1; min-width: 0; gap: 0.5rem; align-items: flex-start; }
     .text { flex: 1; min-width: 0; }
-    /* The panel stays in view while the text scrolls. */
-    /* The vertical scrollbar gets its own gutter and the right padding is larger, so text is never drawn under it.
+    /* The panel stays in view while the text scrolls, below the reader's sticky tools (--tools-space), and ends above the
+       fixed player bar (--player-space). Both are set by the reader. Only .body scrolls, so the action bar never leaves. */
+    aside { position: sticky; top: var(--tools-space, 0px); max-height: calc(100vh - var(--tools-space, 0px) - var(--player-space, 0px));
+            flex: none; min-width: 0; display: flex; flex-direction: column; box-sizing: border-box; padding: 0.5rem 1rem 0.5rem 0.5rem; }
+    /* The vertical scrollbar gets its own gutter, so text is never drawn under it.
        min-width 0 + flex none keep the width exactly as set; long words wrap instead of being clipped. */
-    /* --player-space (set by the reader while the fixed player bar shows) keeps the panel's end above the bar. */
-    aside { position: sticky; top: 0; max-height: calc(100vh - var(--player-space, 0px)); flex: none; min-width: 0; overflow-x: hidden; overflow-y: auto;
-            scrollbar-gutter: stable; box-sizing: border-box; padding: 0.5rem 1rem 0.5rem 0.5rem; }
+    .body { min-height: 0; overflow-x: hidden; overflow-y: auto; scrollbar-gutter: stable; }
     [role=separator] { align-self: stretch; width: 0.4rem; cursor: col-resize; background: GrayText; opacity: 0.4; touch-action: none; }
     [role=separator]:hover, [role=separator]:focus { opacity: 1; }
-    .bar { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+    .bar { flex: none; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
     .preview, .text-result { white-space: pre-wrap; overflow-wrap: anywhere; }
     .preview { opacity: 0.7; }
     @media (max-width: 800px) {
       :host { flex-direction: column; align-items: stretch; }
       aside { position: static; width: auto !important; max-height: none; flex: auto; }
+      .body { overflow-y: visible; }
       [role=separator] { display: none; }
     }
   `,
@@ -53,6 +55,7 @@ type StreamStarter = (selection: TextSelection, signal: AbortSignal) => AsyncGen
         }
         <button type="button" [disabled]="!result()" (click)="clear()">Clear</button>
       </div>
+      <div class="body">
       @if (actionsError()) {
         <p role="alert">{{ actionsError() }}</p>
       }
@@ -69,6 +72,7 @@ type StreamStarter = (selection: TextSelection, signal: AbortSignal) => AsyncGen
           <p role="alert">{{ r.error }}</p>
         }
       }
+      </div>
     </aside>
   `,
 })
