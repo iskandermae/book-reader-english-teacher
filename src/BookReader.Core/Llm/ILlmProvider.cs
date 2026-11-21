@@ -18,6 +18,12 @@ public interface ILlmProvider
     /// <exception cref="LlmModelNotFoundException">The chosen model is not installed.</exception>
     /// <exception cref="LlmUnavailableException">The LLM server cannot be reached.</exception>
     IAsyncEnumerable<string> GenerateAsync(string prompt, CancellationToken ct = default);
+
+    /// <summary>
+    /// Loads the chosen model into memory ahead of the first request, so that request is not slow (cold start).
+    /// Does not throw for a missing model, a stopped server or no configured model: the warm-up is only skipped. It rethrows only when the caller's token is cancelled.
+    /// </summary>
+    Task WarmUpAsync(CancellationToken ct = default);
 }
 
 /// <summary>Base of all expected LLM problems. The message is safe to show to the user and says what to do.</summary>

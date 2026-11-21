@@ -8,7 +8,7 @@ namespace BookReader.Api.Controllers;
 [ApiController]
 [Route("api/settings")]
 [ServiceFilter<SettingsValidationExceptionFilter>]
-public class SettingsController(ISettingsService settings) : ControllerBase
+public class SettingsController(ISettingsService settings, LlmWarmUp warmUp) : ControllerBase
 {
     /// <summary>Returns all settings as a key/value map. Settings never saved have their default value.</summary>
     [HttpGet]
@@ -34,6 +34,12 @@ public class SettingsController(ISettingsService settings) : ControllerBase
     [ProducesResponseType<Dictionary<string, string>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
     public async Task<IReadOnlyDictionary<string, string>> Put(
-        [FromBody] Dictionary<string, string?> values, CancellationToken ct) =>
-        await settings.UpdateAsync(values, ct);
+        [FromBody] Dictionary<string, string?> values, CancellationToken ct)
+    {
+        var all = await settings.UpdateAsync(values, ct);
+        // A new model (or server) is loaded now, so the next Translate is fast.
+        if (values.ContainsKey(SettingsService.OllamaModel) || values.ContainsKey(SettingsService.OllamaUrl))
+            warmUp.Start();
+        return all;
+    }
 }

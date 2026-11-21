@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using BookReader.Core.Settings;
+using Microsoft.Extensions.Logging;
 using OllamaSharp;
 using OllamaSharp.Models;
 using OllamaSharp.Models.Exceptions;
@@ -10,8 +11,12 @@ namespace BookReader.Core.Llm;
 /// Ollama implementation (decisions D5, D6). Url and model are read from settings on every call,
 /// so a change in settings applies at once, without a restart.
 /// </summary>
-public class OllamaProvider(ISettingsService settings, HttpMessageHandler? handler = null) : ILlmProvider
+public class OllamaProvider(ISettingsService settings, HttpMessageHandler? handler = null, ILogger<OllamaProvider>? logger = null) : ILlmProvider
 {
+    // Ollama unloads an idle model after 5 minutes by default; the next request then waits for a slow reload.
+    // A longer keep_alive on every request keeps the model in memory while the user reads.
+    private const string KeepAlive = "30m";
+
     // Short limit for quick checks only; generation itself can legitimately take minutes.
     private static readonly TimeSpan CheckTimeout = TimeSpan.FromSeconds(5);
 
@@ -59,7 +64,7 @@ public class OllamaProvider(ISettingsService settings, HttpMessageHandler? handl
         if (string.IsNullOrWhiteSpace(model))
             throw new LlmNotConfiguredException("Choose a model in settings.");
 
-        var request = new GenerateRequest { Model = model, Prompt = prompt };
+        var request = new GenerateRequest { Model = model, Prompt = prompt, KeepAlive = KeepAlive };
         await using var chunks = CreateClient(url, model).GenerateAsync(request, ct).GetAsyncEnumerator(ct);
         while (true)
         {
@@ -77,6 +82,27 @@ public class OllamaProvider(ISettingsService settings, HttpMessageHandler? handl
                 yield break;
             if (!string.IsNullOrEmpty(chunks.Current?.Response))
                 yield return chunks.Current.Response;
+        }
+    }
+
+    public async Task WarmUpAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var (url, model) = await ReadSettingsAsync(ct);
+            if (string.IsNullOrWhiteSpace(model))
+                return;
+
+            // A request with an empty prompt only loads the model; nothing is generated.
+            var request = new GenerateRequest { Model = model, Prompt = "", KeepAlive = KeepAlive };
+            await foreach (var _ in CreateClient(url, model).GenerateAsync(request, ct)) { }
+            logger?.LogInformation("Ollama model warmed up");
+        }
+        // A caller cancel stays a cancel; every other failure (including our own timeouts) only skips the warm-up.
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            // Warm-up is only an optimization: Ollama down or model missing must not matter. No exception text (may hold user data).
+            logger?.LogWarning("Ollama warm-up skipped ({Reason})", ex.GetType().Name);
         }
     }
 

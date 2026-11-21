@@ -87,6 +87,62 @@ public sealed class OllamaProviderTests
         Assert.False(string.IsNullOrEmpty(status.Error));
     }
 
+    private sealed class RecordingHandler : HttpMessageHandler
+    {
+        public List<string> Bodies { get; } = [];
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            Bodies.Add(await request.Content!.ReadAsStringAsync(ct));
+            return new HttpResponseMessage { Content = new StringContent("""{"model":"m","response":"","done":true}""") };
+        }
+    }
+
+    [Fact]
+    public async Task Generate_asks_ollama_to_keep_the_model_loaded()
+    {
+        var handler = new RecordingHandler();
+
+        await foreach (var _ in new OllamaProvider(new FixedSettings(DeadUrl, "m"), handler).GenerateAsync("hi")) { }
+
+        Assert.Contains("\"keep_alive\":\"30m\"", handler.Bodies.Single());
+    }
+
+    [Fact]
+    public async Task WarmUp_sends_an_empty_prompt_with_keep_alive()
+    {
+        var handler = new RecordingHandler();
+
+        await new OllamaProvider(new FixedSettings(DeadUrl, "m"), handler).WarmUpAsync();
+
+        var body = handler.Bodies.Single();
+        Assert.Contains("\"prompt\":\"\"", body);
+        Assert.Contains("\"keep_alive\":\"30m\"", body);
+    }
+
+    [Fact]
+    public async Task WarmUp_without_a_model_sends_nothing()
+    {
+        var handler = new RecordingHandler();
+
+        await new OllamaProvider(new FixedSettings(DeadUrl, ""), handler).WarmUpAsync();
+
+        Assert.Empty(handler.Bodies);
+    }
+
+    [Fact]
+    public async Task WarmUp_swallows_server_down()
+    {
+        await DeadProvider("m").WarmUpAsync();
+    }
+
+    [Fact]
+    public async Task WarmUp_swallows_model_not_found()
+    {
+        using var server = FakeOllamaServer.Start(404, """{"error":"model 'nope' not found"}""");
+        await Provider(server.Url, "nope").WarmUpAsync();
+    }
+
     internal static OllamaProvider Provider(string url, string model) => new(new FixedSettings(url, model));
 
     internal sealed class FixedSettings(string url, string model) : ISettingsService

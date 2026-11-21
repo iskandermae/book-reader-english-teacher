@@ -11,6 +11,7 @@ Epic 5 rescoped by user 2026-11-04: only S5.1. S5.1 DONE (dev + QA approved 2026
 S5.2 (hotkeys Ctrl+Enter record, Ctrl+Up play; mic processing off, 128 kbps) DONE: dev + QA approved 2026-11-05, 225 tests, build ok. User to compare replay quality, then commit.
 Decision 2026-11-05: user does NOT need stored recordings (recorder stays in-memory, no save/persist stories).
 B1 (AI buttons scrolled away; now sticky panel, only result scrolls) DONE: dev + QA approved 2026-11-21, 226 tests, build ok. User to check in browser, then commit. Known limit: --tools-space is fixed 6.5rem (not measured).
+B2 (slow first Translate: Ollama keep_alive 30m + background warm-up at startup and on model/url change) DONE: dev + QA approved 2026-11-21, 215 backend tests. User to check real timing (first Translate ~2 s), then commit.
 Next: groom S7.1 (Epic 7). Epic 6 needs sync, blocked. S7.4 likely obsolete.
 
 ## Commit checklist for the user (Epic 0)

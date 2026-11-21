@@ -23,6 +23,7 @@ builder.Services.AddScoped<ICustomActionService, CustomActionService>();
 builder.Services.AddScoped<IScratchpadService, ScratchpadService>();
 builder.Services.AddScoped<LlmExceptionFilter>();
 builder.Services.AddScoped<ILlmProvider, OllamaProvider>();
+builder.Services.AddSingleton<BookReader.Api.LlmWarmUp>();
 builder.Services.AddScoped<IBookImportService, BookImportService>();
 builder.Services.AddScoped<IBookLibraryService, BookLibraryService>();
 builder.Services.AddSingleton(sp => new AudioStorage(dataFolder, sp.GetRequiredService<ILogger<AudioStorage>>()));
@@ -40,6 +41,9 @@ using (var scope = app.Services.CreateScope())
 {
     scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.Migrate();
 }
+
+// Load the model in the background once the app is listening, so the first Translate is not a cold start. Never blocks startup.
+app.Lifetime.ApplicationStarted.Register(() => app.Services.GetRequiredService<BookReader.Api.LlmWarmUp>().Start());
 
 app.MapControllers();
 app.MapOpenApi(); // serves /openapi/v1.json; api/openapi.json is generated from it (see api/README.md)

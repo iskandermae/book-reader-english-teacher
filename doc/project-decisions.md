@@ -17,7 +17,7 @@ A web application for reading a book and learning English: read a text book, lis
 | D2 | Database | SQLite (EF Core, migrations) | Single user, zero-setup |
 | D3 | Book format | `.txt` only. Chapters detected by a configurable regex | Target books are free-distributed, e.g. hpmor.com |
 | D4 | Audio | Local audio files attached by the user. A book can have several audio files (e.g. one per chapter; to be confirmed with the user) | No TTS in scope |
-| D5 | LLM access | `ILlmProvider` abstraction. Implementations: Ollama (first), cloud (later, optional). Cloud API key is stored on the backend only | Keeps the product free by default |
+| D5 | LLM access | `ILlmProvider` abstraction. Implementations: Ollama (first), cloud (later, optional). Cloud API key is stored on the backend only. Cloud models (`...-cloud`, e.g. `gpt-oss:120b-cloud`) already work through the signed-in local Ollama (always `ollama.url`, no code); a direct-cloud provider is only S7.4. B2 warm-up (empty prompt + `keep_alive: 30m` at startup and on model/url change) also runs for `-cloud` models; its benefit there is unverified | Keeps the product free by default |
 | D6 | Ollama client | Use the OllamaSharp .NET library from C#. Python is NOT used for LLM calls | Mature library, less moving parts |
 | D7 | Python | Optional, isolated behind CLI tools with a JSON-in/JSON-out contract. Used only for audio-to-text alignment and, if chosen, pronunciation scoring | Python ecosystem (WhisperX, wav2vec2) is the best fit for speech |
 | D8 | Text-audio sync | Sentence-level timestamps produced by forced alignment (spike S4.2 validates). Fallback: chapter-level audio with manual offset | Alignment quality is the biggest technical risk |
