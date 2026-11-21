@@ -42,8 +42,11 @@ public sealed class OpenApiContractTests : ApiTestBase
         return await client.GetStringAsync("/openapi/v1.json");
     }
 
-    // Line endings must not matter (git autocrlf on Windows); the file always ends with one newline.
-    private static string Normalize(string text) => text.Replace("\r\n", "\n").TrimEnd() + "\n";
+    // Line endings must not matter. With git autocrlf on Windows the C# sources (and so the XML-doc summaries)
+    // contain CRLF, which the generated JSON carries as the escaped text \r\n; on Linux it is \n.
+    // Normalize both the real and the escaped form; the file always ends with one newline.
+    private static string Normalize(string text) =>
+        text.Replace("\\r\\n", "\\n").Replace("\r\n", "\n").TrimEnd() + "\n";
 
     private static string FindRepoRoot()
     {

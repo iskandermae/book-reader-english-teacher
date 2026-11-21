@@ -16,6 +16,7 @@ S2.9 (LLM call log, last 10, in memory, `/llm-log` in new tab) DONE: dev + QA ap
 Open: B2 warm-up may not help `-cloud` models (user uses gpt-oss:120b-cloud); first-Translate 18 s cause unconfirmed; waiting for user's timing after restart.
 T1 (run.ps1/run.sh publish API into bin/ and run from there; data in bin/data; ng serve unchanged) DONE: dev + QA approved 2026-11-21. run.sh not run (only bash -n). User to try run.ps1, then commit.
 Agent briefs: if an agent starts the app to check it, use ports other than 5027/4200 and stop it afterwards.
+B3 (2 CI test failures: git-ignored book/1.txt -> inline-text test; openapi CRLF in XML-doc -> Normalize + regenerated openapi.json) DONE: dev + QA approved 2026-11-21, 220 tests. Needs the next CI run to confirm on Linux. Option for user: `.gitattributes` `* text=auto eol=lf` (fixes line endings at the root, also for run.sh).
 Next: groom S7.1 (Epic 7). Epic 6 needs sync, blocked. S7.4 likely obsolete.
 
 ## Commit checklist for the user (Epic 0)

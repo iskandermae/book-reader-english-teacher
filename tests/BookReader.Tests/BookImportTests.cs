@@ -230,23 +230,19 @@ public sealed class BookImportTests : IDisposable
         Assert.NotEqual(first.BookId, second.BookId);
     }
 
+    // Mirrors the shape of the real sample book (book/1.txt is local-only, not in git): one chapter heading,
+    // then a long body that mentions other chapters mid-sentence and must not be split on them.
     [Fact]
-    public async Task Sample_book_imports_as_one_chapter()
+    public async Task Single_chapter_text_that_mentions_other_chapters_imports_as_one_chapter()
     {
-        var path = Path.Combine(FindRepoRoot(), "book", "1.txt");
-        Assert.True(File.Exists(path), $"Sample book is missing: {path}");
-
-        var result = await Import(await File.ReadAllBytesAsync(path), "1.txt");
+        var result = await Import(
+            "Chapter 1: A Day of Very Low Probability\n" +
+            "Disclaimer: this fic hits its stride starting at around Chapter 5.\n\n" +
+            "If you still don't like it after Chapter 10, give up.\n\n" +
+            "* Easy email notification system;\n* Ad-free mirror of the text.\n\n" +
+            "It was a rainy day.\n");
 
         Assert.Equal(1, result.ChapterCount);
-    }
-
-    private static string FindRepoRoot()
-    {
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "BookReader.sln")))
-            dir = dir.Parent;
-        return dir?.FullName ?? throw new InvalidOperationException("Repo root (BookReader.sln) not found.");
     }
 
     public void Dispose()

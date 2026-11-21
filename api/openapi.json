@@ -920,7 +920,7 @@
         "tags": [
           "Books"
         ],
-        "summary": "Searches one book for a phrase. Case, punctuation, extra spaces and apostrophes inside words are ignored;\r\nthe words must appear in order, next to each other, inside one paragraph.",
+        "summary": "Searches one book for a phrase. Case, punctuation, extra spaces and apostrophes inside words are ignored;\nthe words must appear in order, next to each other, inside one paragraph.",
         "parameters": [
           {
             "name": "id",
@@ -1384,7 +1384,7 @@
         "tags": [
           "Llm"
         ],
-        "summary": "Sends a prompt to the chosen model and streams the answer as Server-Sent Events.\r\nEach chunk is an event with a JSON string as data (for example `data: \"Hello\"`); the stream ends with `event: done`.\r\nIf the model fails after the stream started, an `event: error` with the message as data is sent instead.",
+        "summary": "Sends a prompt to the chosen model and streams the answer as Server-Sent Events.\nEach chunk is an event with a JSON string as data (for example `data: \"Hello\"`); the stream ends with `event: done`.\nIf the model fails after the stream started, an `event: error` with the message as data is sent instead.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1444,7 +1444,7 @@
         "tags": [
           "Llm"
         ],
-        "summary": "Translates the selected text into the native language (setting `language.native`, Ukrainian by default) and streams the translation.\r\nThe prompt is the saved template `prompt.translate` with its placeholders filled. The stream format is the same as in the test endpoint.",
+        "summary": "Translates the selected text into the native language (setting `language.native`, Ukrainian by default) and streams the translation.\nThe prompt is the saved template `prompt.translate` with its placeholders filled. The stream format is the same as in the test endpoint.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1504,7 +1504,7 @@
         "tags": [
           "Llm"
         ],
-        "summary": "Explains the selected text in simple English as three lines (Meaning, Grammar, Usage) and streams the answer.\r\nThe prompt is the saved template `prompt.explain` with its placeholders filled. The stream format is the same as in the test endpoint.",
+        "summary": "Explains the selected text in simple English as three lines (Meaning, Grammar, Usage) and streams the answer.\nThe prompt is the saved template `prompt.explain` with its placeholders filled. The stream format is the same as in the test endpoint.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1564,7 +1564,7 @@
         "tags": [
           "Llm"
         ],
-        "summary": "Runs a custom action: its saved prompt template is filled like the Translate and Explain templates and the answer is streamed.\r\nThe stream format is the same as in the test endpoint.",
+        "summary": "Runs a custom action: its saved prompt template is filled like the Translate and Explain templates and the answer is streamed.\nThe stream format is the same as in the test endpoint.",
         "parameters": [
           {
             "name": "id",
